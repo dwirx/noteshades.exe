@@ -21,10 +21,11 @@ RCFLAGS = "--preprocessor=gcc -E -xc -DRC_INVOKED"
 SRCS = $(SRC_DIR)/main.c \
        $(SRC_DIR)/file_ops.c \
        $(SRC_DIR)/edit_ops.c \
-       $(SRC_DIR)/dialogs.c
+       $(SRC_DIR)/dialogs.c \
+       $(SRC_DIR)/line_numbers.c
 
 # Object files
-OBJS = $(SRC_DIR)/main.o $(SRC_DIR)/file_ops.o $(SRC_DIR)/edit_ops.o $(SRC_DIR)/dialogs.o
+OBJS = $(SRC_DIR)/main.o $(SRC_DIR)/file_ops.o $(SRC_DIR)/edit_ops.o $(SRC_DIR)/dialogs.o $(SRC_DIR)/line_numbers.o
 
 # Resource files
 RES_SRC = $(SRC_DIR)/notepad.rc
@@ -50,6 +51,9 @@ $(SRC_DIR)/edit_ops.o: $(SRC_DIR)/edit_ops.c $(SRC_DIR)/notepad.h $(SRC_DIR)/res
 
 $(SRC_DIR)/dialogs.o: $(SRC_DIR)/dialogs.c $(SRC_DIR)/notepad.h $(SRC_DIR)/resource.h
 	$(CC) $(CFLAGS) -c $(SRC_DIR)/dialogs.c -o $(SRC_DIR)/dialogs.o
+
+$(SRC_DIR)/line_numbers.o: $(SRC_DIR)/line_numbers.c $(SRC_DIR)/notepad.h $(SRC_DIR)/resource.h
+	$(CC) $(CFLAGS) -c $(SRC_DIR)/line_numbers.c -o $(SRC_DIR)/line_numbers.o
 
 # Compile resource file
 $(RES_OBJ): $(RES_SRC) $(SRC_DIR)/resource.h

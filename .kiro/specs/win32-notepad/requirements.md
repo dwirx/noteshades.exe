@@ -91,3 +91,15 @@ Dokumen ini mendefinisikan requirements untuk aplikasi Notepad sederhana yang di
 
 1. WHEN pengguna memilih menu Help > About THEN Notepad SHALL menampilkan dialog About dengan informasi aplikasi
 2. WHEN dialog About ditampilkan THEN Notepad SHALL menunjukkan nama aplikasi dan versi
+
+### Requirement 8
+
+**User Story:** Sebagai pengguna, saya ingin menampilkan dan menyembunyikan nomor baris, sehingga saya dapat dengan mudah melacak posisi baris dalam dokumen.
+
+#### Acceptance Criteria
+
+1. WHEN pengguna memilih menu View > Line Numbers THEN Notepad SHALL menampilkan nomor baris di sebelah kiri area teks
+2. WHEN nomor baris ditampilkan THEN Notepad SHALL menunjukkan nomor untuk setiap baris teks dimulai dari 1
+3. WHEN pengguna memilih menu View > Line Numbers dan nomor baris sudah ditampilkan THEN Notepad SHALL menyembunyikan nomor baris
+4. WHEN nomor baris ditampilkan THEN Notepad SHALL memperbarui nomor baris secara otomatis saat pengguna menambah atau menghapus baris
+5. WHEN area teks di-scroll THEN Notepad SHALL menjaga sinkronisasi antara nomor baris dan konten teks

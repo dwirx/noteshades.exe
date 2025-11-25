@@ -14,6 +14,13 @@
 /* Maximum number of tabs */
 #define MAX_TABS 32
 
+/* Line number state structure */
+typedef struct {
+    BOOL bShowLineNumbers;       /* Flag to show/hide line numbers */
+    HWND hwndLineNumbers;        /* Handle for line number window */
+    int nLineNumberWidth;        /* Width of line number panel (in pixels) */
+} LineNumberState;
+
 /* Tab/Document state structure */
 typedef struct {
     TCHAR szFileName[MAX_PATH];  /* Full path of current file */
@@ -22,6 +29,7 @@ typedef struct {
     HWND hwndEdit;               /* Edit control for this tab */
     WCHAR* pContent;             /* Content buffer for large files */
     DWORD dwContentSize;         /* Size of content */
+    LineNumberState lineNumState; /* Line number state for this tab */
 } TabState;
 
 /* Application state structure */
@@ -32,6 +40,7 @@ typedef struct {
     HWND hwndStatus;             /* Status bar handle */
     HACCEL hAccel;               /* Accelerator table handle */
     BOOL bWordWrap;              /* Word wrap enabled flag */
+    BOOL bShowLineNumbers;       /* Global line numbers enabled flag */
     int nTabCount;               /* Number of open tabs */
     int nCurrentTab;             /* Currently active tab index */
     TabState tabs[MAX_TABS];     /* Array of tab states */
@@ -85,5 +94,14 @@ void SwitchToTab(HWND hwnd, int nTabIndex);
 void UpdateTabTitle(int nTabIndex);
 HWND GetCurrentEdit(void);
 TabState* GetCurrentTabState(void);
+
+/* Line number operations */
+HWND CreateLineNumberWindow(HWND hwndParent, HINSTANCE hInstance);
+void UpdateLineNumbers(HWND hwndLineNumbers, HWND hwndEdit);
+void ToggleLineNumbers(HWND hwnd);
+void SyncLineNumberScroll(HWND hwndLineNumbers, HWND hwndEdit);
+int CalculateLineNumberWidth(int nLineCount);
+LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+void RepositionControls(HWND hwnd);
 
 #endif /* NOTEPAD_H */

@@ -13,6 +13,29 @@ static HFONT g_hFont = NULL;
 /* RichEdit library handle */
 static HMODULE g_hRichEdit = NULL;
 
+/* Original edit control window procedure */
+static WNDPROC g_OrigEditProc = NULL;
+
+/* Subclassed edit control procedure to catch scroll events */
+static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+        case WM_VSCROLL:
+        case WM_MOUSEWHEEL:
+        case WM_KEYDOWN: {
+            /* Call original proc first */
+            LRESULT result = CallWindowProc(g_OrigEditProc, hwnd, msg, wParam, lParam);
+            
+            /* Then sync line numbers */
+            TabState* pTab = GetCurrentTabState();
+            if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+            }
+            return result;
+        }
+    }
+    return CallWindowProc(g_OrigEditProc, hwnd, msg, wParam, lParam);
+}
+
 /* Tab control height */
 #define TAB_HEIGHT 28
 
@@ -43,6 +66,9 @@ void InitTabState(TabState* pState) {
     pState->hwndEdit = NULL;
     pState->pContent = NULL;
     pState->dwContentSize = 0;
+    pState->lineNumState.bShowLineNumbers = FALSE;
+    pState->lineNumState.hwndLineNumbers = NULL;
+    pState->lineNumState.nLineNumberWidth = 0;
 }
 
 /* Create edit control for a tab */
@@ -108,6 +134,9 @@ static HWND CreateTabEditControl(HWND hwndParent, BOOL bWordWrap) {
         
         /* Set text limit to maximum */
         SendMessage(hwndEdit, EM_SETLIMITTEXT, 0, 0);
+        
+        /* Subclass edit control to catch scroll events */
+        g_OrigEditProc = (WNDPROC)SetWindowLongPtr(hwndEdit, GWLP_WNDPROC, (LONG_PTR)EditSubclassProc);
     }
     
     return hwndEdit;
@@ -127,6 +156,13 @@ int AddNewTab(HWND hwnd, const TCHAR* szTitle) {
     
     /* Create edit control for this tab */
     g_AppState.tabs[nNewTab].hwndEdit = CreateTabEditControl(hwnd, g_AppState.bWordWrap);
+    
+    /* Create line number window if line numbers are enabled */
+    if (g_AppState.bShowLineNumbers) {
+        g_AppState.tabs[nNewTab].lineNumState.hwndLineNumbers = CreateLineNumberWindow(hwnd, g_AppState.hInstance);
+        g_AppState.tabs[nNewTab].lineNumState.bShowLineNumbers = TRUE;
+        g_AppState.tabs[nNewTab].lineNumState.nLineNumberWidth = CalculateLineNumberWidth(1);
+    }
     
     /* Add tab to tab control */
     TCITEM tie = {0};
@@ -162,6 +198,11 @@ void CloseTab(HWND hwnd, int nTabIndex) {
         DestroyWindow(pTab->hwndEdit);
     }
     
+    /* Destroy line number window */
+    if (pTab->lineNumState.hwndLineNumbers) {
+        DestroyWindow(pTab->lineNumState.hwndLineNumbers);
+    }
+    
     /* Free content buffer if allocated */
     if (pTab->pContent) {
         HeapFree(GetProcessHeap(), 0, pTab->pContent);
@@ -192,22 +233,38 @@ void CloseTab(HWND hwnd, int nTabIndex) {
 void SwitchToTab(HWND hwnd, int nTabIndex) {
     if (nTabIndex < 0 || nTabIndex >= g_AppState.nTabCount) return;
     
-    /* Hide current edit control */
+    /* Hide current edit control and line numbers */
     if (g_AppState.nCurrentTab >= 0 && g_AppState.nCurrentTab < g_AppState.nTabCount) {
         ShowWindow(g_AppState.tabs[g_AppState.nCurrentTab].hwndEdit, SW_HIDE);
+        if (g_AppState.tabs[g_AppState.nCurrentTab].lineNumState.hwndLineNumbers) {
+            ShowWindow(g_AppState.tabs[g_AppState.nCurrentTab].lineNumState.hwndLineNumbers, SW_HIDE);
+        }
     }
     
     g_AppState.nCurrentTab = nTabIndex;
     
-    /* Show and resize new edit control */
-    HWND hwndEdit = g_AppState.tabs[nTabIndex].hwndEdit;
-    if (hwndEdit) {
-        RECT rc;
-        GetClientRect(hwnd, &rc);
-        MoveWindow(hwndEdit, 0, TAB_HEIGHT, rc.right, rc.bottom - TAB_HEIGHT, TRUE);
-        ShowWindow(hwndEdit, SW_SHOW);
-        SetFocus(hwndEdit);
+    TabState* pTab = &g_AppState.tabs[nTabIndex];
+    
+    /* Show line number window if enabled */
+    if (g_AppState.bShowLineNumbers) {
+        /* Create line number window if not exists */
+        if (!pTab->lineNumState.hwndLineNumbers) {
+            pTab->lineNumState.hwndLineNumbers = CreateLineNumberWindow(hwnd, g_AppState.hInstance);
+            pTab->lineNumState.bShowLineNumbers = TRUE;
+            int nLines = (int)SendMessage(pTab->hwndEdit, EM_GETLINECOUNT, 0, 0);
+            pTab->lineNumState.nLineNumberWidth = CalculateLineNumberWidth(nLines);
+        }
+        ShowWindow(pTab->lineNumState.hwndLineNumbers, SW_SHOW);
     }
+    
+    /* Show edit control */
+    if (pTab->hwndEdit) {
+        ShowWindow(pTab->hwndEdit, SW_SHOW);
+        SetFocus(pTab->hwndEdit);
+    }
+    
+    /* Reposition controls */
+    RepositionControls(hwnd);
     
     /* Update tab control selection */
     TabCtrl_SetCurSel(g_AppState.hwndTab, nTabIndex);
@@ -327,16 +384,29 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
         
         case WM_SIZE: {
-            RECT rc;
-            GetClientRect(hwnd, &rc);
-            
-            /* Resize tab control */
-            MoveWindow(g_AppState.hwndTab, 0, 0, rc.right, TAB_HEIGHT, TRUE);
-            
-            /* Resize current edit control */
-            HWND hwndEdit = GetCurrentEdit();
-            if (hwndEdit) {
-                MoveWindow(hwndEdit, 0, TAB_HEIGHT, rc.right, rc.bottom - TAB_HEIGHT, TRUE);
+            /* Use RepositionControls to handle all control positioning */
+            RepositionControls(hwnd);
+            return 0;
+        }
+        
+        case WM_VSCROLL:
+        case WM_MOUSEWHEEL: {
+            /* Sync line numbers when scrolling */
+            TabState* pTab = GetCurrentTabState();
+            if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                /* Use a timer to sync after scroll completes */
+                SetTimer(hwnd, 1, 10, NULL);
+            }
+            break;
+        }
+        
+        case WM_TIMER: {
+            if (wParam == 1) {
+                KillTimer(hwnd, 1);
+                TabState* pTab = GetCurrentTabState();
+                if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                    SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+                }
             }
             return 0;
         }
@@ -480,6 +550,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     ToggleWordWrap(hwnd);
                     break;
                 
+                /* View menu */
+                case IDM_VIEW_LINENUMBERS:
+                    ToggleLineNumbers(hwnd);
+                    break;
+                
                 /* Help menu */
                 case IDM_HELP_ABOUT:
                     ShowAboutDialog(hwnd);
@@ -490,6 +565,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     if (HIWORD(wParam) == EN_CHANGE && pTab) {
                         pTab->bModified = TRUE;
                         UpdateTabTitle(g_AppState.nCurrentTab);
+                        
+                        /* Update line numbers if visible */
+                        if (g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                            /* Recalculate width if line count changed significantly */
+                            int nLines = (int)SendMessage(pTab->hwndEdit, EM_GETLINECOUNT, 0, 0);
+                            int nNewWidth = CalculateLineNumberWidth(nLines);
+                            if (nNewWidth != pTab->lineNumState.nLineNumberWidth) {
+                                pTab->lineNumState.nLineNumberWidth = nNewWidth;
+                                RepositionControls(hwnd);
+                            }
+                            UpdateLineNumbers(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+                        }
                     }
                     break;
             }
@@ -515,6 +602,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             for (int i = 0; i < g_AppState.nTabCount; i++) {
                 if (g_AppState.tabs[i].hwndEdit) {
                     DestroyWindow(g_AppState.tabs[i].hwndEdit);
+                }
+                if (g_AppState.tabs[i].lineNumState.hwndLineNumbers) {
+                    DestroyWindow(g_AppState.tabs[i].lineNumState.hwndLineNumbers);
                 }
                 if (g_AppState.tabs[i].pContent) {
                     HeapFree(GetProcessHeap(), 0, g_AppState.tabs[i].pContent);

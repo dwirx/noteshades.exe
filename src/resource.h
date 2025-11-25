@@ -18,6 +18,9 @@
 /* Format menu command IDs */
 #define IDM_FORMAT_WORDWRAP 251
 
+/* View menu command IDs */
+#define IDM_VIEW_LINENUMBERS 261
+
 /* Help menu command IDs */
 #define IDM_HELP_ABOUT      301
 
@@ -25,6 +28,7 @@
 #define IDC_EDIT            401
 #define IDC_STATUS          402
 #define IDC_TAB             403
+#define IDC_LINENUMBERS     404
 
 /* Tab menu command IDs */
 #define IDM_FILE_NEWTAB     106

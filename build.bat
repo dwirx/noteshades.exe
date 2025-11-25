@@ -21,13 +21,17 @@ echo [4/5] Compiling dialogs.c...
 gcc -Wall -Wextra -O2 -DUNICODE -D_UNICODE -c src/dialogs.c -o src/dialogs.o
 if errorlevel 1 goto error
 
-echo [5/5] Compiling resources...
+echo [5/6] Compiling line_numbers.c...
+gcc -Wall -Wextra -O2 -DUNICODE -D_UNICODE -c src/line_numbers.c -o src/line_numbers.o
+if errorlevel 1 goto error
+
+echo [6/6] Compiling resources...
 windres "--preprocessor=gcc -E -xc -DRC_INVOKED" src/notepad.rc -o src/notepad.o
 if errorlevel 1 goto error
 
 echo.
 echo Linking...
-gcc src/main.o src/file_ops.o src/edit_ops.o src/dialogs.o src/notepad.o -o notepad.exe -mwindows -lcomctl32 -lcomdlg32
+gcc src/main.o src/file_ops.o src/edit_ops.o src/dialogs.o src/line_numbers.o src/notepad.o -o notepad.exe -mwindows -lcomctl32 -lcomdlg32
 if errorlevel 1 goto error
 
 echo.
@@ -41,6 +45,7 @@ echo   - Large file support (up to 500MB)
 echo   - Fast streaming for big files
 echo   - UTF-8 encoding
 echo   - Word wrap toggle
+echo   - Line numbers toggle
 echo.
 echo Run notepad.exe to start the application.
 echo ========================================

@@ -103,6 +103,9 @@ Edit
 ├── ─────────
 └── Select All  (Ctrl+A)
 
+View
+└── Line Numbers
+
 Help
 └── About
 ```
@@ -181,6 +184,58 @@ void ShowAboutDialog(HWND hwnd);
 void ShowErrorDialog(HWND hwnd, const TCHAR* szMessage);
 ```
 
+### 6. Line Number Component
+
+**Tanggung Jawab:**
+- Menampilkan nomor baris di sebelah kiri area teks
+- Menyembunyikan nomor baris saat dinonaktifkan
+- Menjaga sinkronisasi nomor baris dengan konten teks
+- Menangani scroll dan update otomatis
+
+**Design Approach:**
+
+Implementasi menggunakan custom window sebagai line number panel yang akan di-paint secara manual. Panel ini akan ditempatkan di sebelah kiri edit control dan akan di-scroll secara sinkron dengan edit control.
+
+**Interface:**
+```c
+// Line number state
+typedef struct {
+    BOOL bShowLineNumbers;       // Flag untuk menampilkan/menyembunyikan
+    HWND hwndLineNumbers;        // Handle untuk line number window
+    int nLineNumberWidth;        // Lebar panel nomor baris (dalam pixels)
+} LineNumberState;
+
+// Line number operations
+HWND CreateLineNumberWindow(HWND hwndParent, HINSTANCE hInstance);
+void UpdateLineNumbers(HWND hwndLineNumbers, HWND hwndEdit);
+void ToggleLineNumbers(HWND hwndMain, LineNumberState* pState);
+void SyncLineNumberScroll(HWND hwndLineNumbers, HWND hwndEdit);
+int CalculateLineNumberWidth(int nLineCount);
+
+// Window procedure untuk line number window
+LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+```
+
+**Layout Management:**
+
+Saat line numbers aktif:
+```
++---+---------------------------+
+| 1 | Text content line 1       |
+| 2 | Text content line 2       |
+| 3 | Text content line 3       |
++---+---------------------------+
+```
+
+Saat line numbers nonaktif:
+```
++-------------------------------+
+| Text content line 1           |
+| Text content line 2           |
+| Text content line 3           |
++-------------------------------+
+```
+
 ## Data Models
 
 ### FileState Structure
@@ -203,6 +258,7 @@ typedef struct {
     HWND hwndStatus;            // Handle status bar
     HACCEL hAccel;              // Handle accelerator table
     FileState fileState;        // Status file saat ini
+    LineNumberState lineNumState; // Status line numbers
 } AppState;
 ```
 
@@ -223,12 +279,16 @@ typedef struct {
 #define IDM_EDIT_PASTE      204
 #define IDM_EDIT_SELECTALL  205
 
+// View menu
+#define IDM_VIEW_LINENUMBERS 301
+
 // Help menu
-#define IDM_HELP_ABOUT      301
+#define IDM_HELP_ABOUT      401
 
 // Control IDs
-#define IDC_EDIT            401
-#define IDC_STATUS          402
+#define IDC_EDIT            501
+#define IDC_STATUS          502
+#define IDC_LINENUMBERS     503
 ```
 
 
@@ -286,6 +346,30 @@ Berdasarkan analisis acceptance criteria, berikut adalah correctness properties 
 *For any* keyboard shortcut yang didefinisikan (Ctrl+N, Ctrl+O, Ctrl+S, Ctrl+Z, Ctrl+X, Ctrl+C, Ctrl+V, Ctrl+A), shortcut tersebut harus memetakan ke command ID yang sesuai.
 
 **Validates: Requirements 6.4**
+
+### Property 9: Line Number Visibility Toggle
+
+*For any* state of line number visibility (shown or hidden), selecting the View > Line Numbers menu item should toggle the visibility to the opposite state.
+
+**Validates: Requirements 8.1, 8.3**
+
+### Property 10: Line Number Count Matches Text Lines
+
+*For any* text content with N lines, when line numbers are displayed, the line number panel should show exactly N line numbers starting from 1.
+
+**Validates: Requirements 8.2**
+
+### Property 11: Line Numbers Update on Content Change
+
+*For any* edit operation that changes the line count (adding or removing lines), the line number display should automatically update to reflect the new line count.
+
+**Validates: Requirements 8.4**
+
+### Property 12: Line Number Scroll Synchronization
+
+*For any* scroll position in the edit control, the line number panel should be scrolled to the same vertical position, maintaining alignment between line numbers and text lines.
+
+**Validates: Requirements 8.5**
 
 ## Error Handling
 
@@ -354,6 +438,12 @@ Unit tests akan mencakup:
    - Test format judul untuk dokumen untitled
    - Test format judul untuk dokumen dengan nama file
 
+4. **Line Number Tests**
+   - Test line number window creation
+   - Test line number width calculation
+   - Test line number visibility toggle
+   - Test line number painting for specific line counts
+
 ### Property-Based Testing
 
 Menggunakan library **theft** (property-based testing untuk C) atau implementasi sederhana dengan random input generation.
@@ -399,6 +489,30 @@ Menggunakan library **theft** (property-based testing untuk C) atau implementasi
    - For each defined accelerator
    - Verify maps to correct command ID
    - Tag: `**Feature: win32-notepad, Property 8: Accelerator Keys Map to Correct Commands**`
+
+7. **Property 9: Line Number Toggle**
+   - Generate initial visibility state
+   - Toggle line numbers
+   - Verify visibility changed to opposite state
+   - Tag: `**Feature: win32-notepad, Property 9: Line Number Visibility Toggle**`
+
+8. **Property 10: Line Count Consistency**
+   - Generate random text with N lines
+   - Display line numbers
+   - Verify line number panel shows 1 to N
+   - Tag: `**Feature: win32-notepad, Property 10: Line Number Count Matches Text Lines**`
+
+9. **Property 11: Line Number Auto-Update**
+   - Generate random text
+   - Perform line-changing edit operation
+   - Verify line numbers updated automatically
+   - Tag: `**Feature: win32-notepad, Property 11: Line Numbers Update on Content Change**`
+
+10. **Property 12: Scroll Synchronization**
+    - Generate text with many lines
+    - Scroll to random position
+    - Verify line number panel scrolled to same position
+    - Tag: `**Feature: win32-notepad, Property 12: Line Number Scroll Synchronization**`
 
 ### Test File Structure
 
