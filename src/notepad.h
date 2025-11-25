@@ -1,0 +1,89 @@
+#ifndef NOTEPAD_H
+#define NOTEPAD_H
+
+#include <windows.h>
+#include <tchar.h>
+#include <commctrl.h>
+#include <commdlg.h>
+#include "resource.h"
+
+/* Application name */
+#define APP_NAME TEXT("Notepad")
+#define APP_VERSION TEXT("2.0")
+
+/* Maximum number of tabs */
+#define MAX_TABS 32
+
+/* Tab/Document state structure */
+typedef struct {
+    TCHAR szFileName[MAX_PATH];  /* Full path of current file */
+    BOOL bModified;              /* Unsaved changes flag */
+    BOOL bUntitled;              /* New document without name flag */
+    HWND hwndEdit;               /* Edit control for this tab */
+    WCHAR* pContent;             /* Content buffer for large files */
+    DWORD dwContentSize;         /* Size of content */
+} TabState;
+
+/* Application state structure */
+typedef struct {
+    HINSTANCE hInstance;         /* Application instance handle */
+    HWND hwndMain;               /* Main window handle */
+    HWND hwndTab;                /* Tab control handle */
+    HWND hwndStatus;             /* Status bar handle */
+    HACCEL hAccel;               /* Accelerator table handle */
+    BOOL bWordWrap;              /* Word wrap enabled flag */
+    int nTabCount;               /* Number of open tabs */
+    int nCurrentTab;             /* Currently active tab index */
+    TabState tabs[MAX_TABS];     /* Array of tab states */
+} AppState;
+
+/* Global application state */
+extern AppState g_AppState;
+
+/* Main window functions */
+ATOM RegisterMainWindowClass(HINSTANCE hInstance);
+HWND CreateMainWindow(HINSTANCE hInstance, int nCmdShow);
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+/* File operations */
+BOOL FileNew(HWND hwnd);
+BOOL FileOpen(HWND hwnd);
+BOOL FileSave(HWND hwnd);
+BOOL FileSaveAs(HWND hwnd);
+BOOL PromptSaveChanges(HWND hwnd);
+void UpdateWindowTitle(HWND hwnd);
+
+/* Edit operations */
+void EditUndo(HWND hEdit);
+void EditCut(HWND hEdit);
+void EditCopy(HWND hEdit);
+void EditPaste(HWND hEdit);
+void EditSelectAll(HWND hEdit);
+
+/* Dialog operations */
+BOOL ShowOpenDialog(HWND hwnd, TCHAR* szFileName, DWORD nMaxFile);
+BOOL ShowSaveDialog(HWND hwnd, TCHAR* szFileName, DWORD nMaxFile);
+int ShowConfirmSaveDialog(HWND hwnd);
+void ShowAboutDialog(HWND hwnd);
+void ShowErrorDialog(HWND hwnd, const TCHAR* szMessage);
+
+/* Helper functions */
+void InitTabState(TabState* pState);
+BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName);
+BOOL WriteFileContent(HWND hEdit, const TCHAR* szFileName);
+BOOL ReadLargeFile(const TCHAR* szFileName, WCHAR** ppContent, DWORD* pdwSize);
+BOOL WriteLargeFile(const TCHAR* szFileName, const WCHAR* pContent, DWORD dwSize);
+
+/* Format operations */
+void ToggleWordWrap(HWND hwnd);
+void RecreateEditControl(HWND hwnd, int nTabIndex, BOOL bWordWrap);
+
+/* Tab operations */
+int AddNewTab(HWND hwnd, const TCHAR* szTitle);
+void CloseTab(HWND hwnd, int nTabIndex);
+void SwitchToTab(HWND hwnd, int nTabIndex);
+void UpdateTabTitle(int nTabIndex);
+HWND GetCurrentEdit(void);
+TabState* GetCurrentTabState(void);
+
+#endif /* NOTEPAD_H */

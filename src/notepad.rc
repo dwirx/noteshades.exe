@@ -1,0 +1,67 @@
+/* Menu command IDs */
+#define IDM_FILE_NEW        101
+#define IDM_FILE_OPEN       102
+#define IDM_FILE_SAVE       103
+#define IDM_FILE_SAVEAS     104
+#define IDM_FILE_EXIT       105
+#define IDM_FILE_NEWTAB     106
+#define IDM_FILE_CLOSETAB   107
+#define IDM_EDIT_UNDO       201
+#define IDM_EDIT_CUT        202
+#define IDM_EDIT_COPY       203
+#define IDM_EDIT_PASTE      204
+#define IDM_EDIT_SELECTALL  205
+#define IDM_FORMAT_WORDWRAP 251
+#define IDM_HELP_ABOUT      301
+#define IDR_MAINMENU        1000
+#define IDR_ACCEL           1001
+
+/* Main Menu */
+IDR_MAINMENU MENU
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "&New\tCtrl+N",            IDM_FILE_NEW
+        MENUITEM "New &Tab\tCtrl+T",        IDM_FILE_NEWTAB
+        MENUITEM "&Open...\tCtrl+O",        IDM_FILE_OPEN
+        MENUITEM "&Save\tCtrl+S",           IDM_FILE_SAVE
+        MENUITEM "Save &As...",             IDM_FILE_SAVEAS
+        MENUITEM SEPARATOR
+        MENUITEM "&Close Tab\tCtrl+W",      IDM_FILE_CLOSETAB
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit",                   IDM_FILE_EXIT
+    END
+    POPUP "&Edit"
+    BEGIN
+        MENUITEM "&Undo\tCtrl+Z",           IDM_EDIT_UNDO
+        MENUITEM SEPARATOR
+        MENUITEM "Cu&t\tCtrl+X",            IDM_EDIT_CUT
+        MENUITEM "&Copy\tCtrl+C",           IDM_EDIT_COPY
+        MENUITEM "&Paste\tCtrl+V",          IDM_EDIT_PASTE
+        MENUITEM SEPARATOR
+        MENUITEM "Select &All\tCtrl+A",     IDM_EDIT_SELECTALL
+    END
+    POPUP "F&ormat"
+    BEGIN
+        MENUITEM "&Word Wrap",              IDM_FORMAT_WORDWRAP
+    END
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "&About",                  IDM_HELP_ABOUT
+    END
+END
+
+/* Accelerator Table for Keyboard Shortcuts */
+IDR_ACCEL ACCELERATORS
+BEGIN
+    "N",    IDM_FILE_NEW,       VIRTKEY, CONTROL
+    "T",    IDM_FILE_NEWTAB,    VIRTKEY, CONTROL
+    "O",    IDM_FILE_OPEN,      VIRTKEY, CONTROL
+    "S",    IDM_FILE_SAVE,      VIRTKEY, CONTROL
+    "W",    IDM_FILE_CLOSETAB,  VIRTKEY, CONTROL
+    "Z",    IDM_EDIT_UNDO,      VIRTKEY, CONTROL
+    "X",    IDM_EDIT_CUT,       VIRTKEY, CONTROL
+    "C",    IDM_EDIT_COPY,      VIRTKEY, CONTROL
+    "V",    IDM_EDIT_PASTE,     VIRTKEY, CONTROL
+    "A",    IDM_EDIT_SELECTALL, VIRTKEY, CONTROL
+END

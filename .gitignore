@@ -1,0 +1,37 @@
+# Compiled Object files
+*.o
+*.obj
+
+# Compiled Resource files
+*.res
+
+# Executables
+*.exe
+
+# Windows specific
+Thumbs.db
+Desktop.ini
+
+# Build artifacts
+*.dll
+*.so
+*.dylib
+
+# Editor/IDE files
+.vscode/
+.vs/
+*.swp
+*.swo
+*~
+
+# Dependency directories
+node_modules/
+
+# Debug files
+*.pdb
+*.ilk
+
+# Temporary files
+*.tmp
+*.temp
+*.log
