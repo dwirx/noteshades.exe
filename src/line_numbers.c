@@ -154,6 +154,11 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, RGB(100, 100, 100));
             
+            /* Get current line for relative numbering */
+            DWORD dwCursorPos = 0, dwCursorEnd = 0;
+            SendMessage(hwndEdit, EM_GETSEL, (WPARAM)&dwCursorPos, (LPARAM)&dwCursorEnd);
+            int nCurrentLine = (int)SendMessage(hwndEdit, EM_LINEFROMCHAR, dwCursorPos, 0);
+            
             TCHAR szLineNum[16];
             RECT rcLine;
             rcLine.left = 4;
@@ -187,7 +192,24 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
                 rcLine.top = nY;
                 rcLine.bottom = nY + nLineHeight;
                 
-                _sntprintf(szLineNum, 16, TEXT("%d"), nLineNum);
+                /* Calculate display number based on relative mode */
+                int nDisplayNum;
+                if (g_AppState.bRelativeLineNumbers) {
+                    if (nLine == nCurrentLine) {
+                        /* Current line shows absolute number */
+                        nDisplayNum = nLineNum;
+                        /* Highlight current line number */
+                        SetTextColor(hdc, RGB(0, 0, 0)); /* Black for current */
+                    } else {
+                        /* Other lines show relative distance */
+                        nDisplayNum = abs(nLine - nCurrentLine);
+                        SetTextColor(hdc, RGB(100, 100, 100)); /* Gray for relative */
+                    }
+                } else {
+                    nDisplayNum = nLineNum;
+                }
+                
+                _sntprintf(szLineNum, 16, TEXT("%d"), nDisplayNum);
                 DrawText(hdc, szLineNum, -1, &rcLine, DT_RIGHT | DT_TOP | DT_SINGLELINE);
             }
             
@@ -231,6 +253,22 @@ void SyncLineNumberScroll(HWND hwndLineNumbers, HWND hwndEdit) {
     
     /* Invalidate without erasing background for smoother redraw */
     InvalidateRect(hwndLineNumbers, NULL, FALSE);
+}
+
+/* Toggle relative line numbers */
+void ToggleRelativeLineNumbers(HWND hwnd) {
+    g_AppState.bRelativeLineNumbers = !g_AppState.bRelativeLineNumbers;
+    
+    /* Update menu check mark */
+    HMENU hMenu = GetMenu(hwnd);
+    CheckMenuItem(hMenu, IDM_VIEW_RELATIVENUM, 
+                  g_AppState.bRelativeLineNumbers ? MF_CHECKED : MF_UNCHECKED);
+    
+    /* Refresh line numbers display */
+    TabState* pTab = GetCurrentTabState();
+    if (pTab && pTab->lineNumState.hwndLineNumbers && g_AppState.bShowLineNumbers) {
+        InvalidateRect(pTab->lineNumState.hwndLineNumbers, NULL, TRUE);
+    }
 }
 
 /* Toggle line numbers visibility */

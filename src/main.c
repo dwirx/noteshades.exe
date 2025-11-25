@@ -501,6 +501,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             /* Initialize word wrap to OFF by default */
             g_AppState.bWordWrap = FALSE;
             g_AppState.bShowLineNumbers = TRUE;  /* Line numbers ON by default */
+            g_AppState.bRelativeLineNumbers = FALSE;  /* Relative numbers OFF by default */
             g_AppState.nTabCount = 0;
             g_AppState.nCurrentTab = -1;
             
@@ -541,6 +542,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             HMENU hMenu = GetMenu(hwnd);
             CheckMenuItem(hMenu, IDM_VIEW_LINENUMBERS, 
                           g_AppState.bShowLineNumbers ? MF_CHECKED : MF_UNCHECKED);
+            CheckMenuItem(hMenu, IDM_VIEW_RELATIVENUM, 
+                          g_AppState.bRelativeLineNumbers ? MF_CHECKED : MF_UNCHECKED);
             CheckMenuItem(hMenu, IDM_FORMAT_WORDWRAP, 
                           g_AppState.bWordWrap ? MF_CHECKED : MF_UNCHECKED);
             CheckMenuItem(hMenu, IDM_VIEW_SYNTAX, 
@@ -775,6 +778,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 /* View menu */
                 case IDM_VIEW_LINENUMBERS:
                     ToggleLineNumbers(hwnd);
+                    break;
+                
+                case IDM_VIEW_RELATIVENUM:
+                    ToggleRelativeLineNumbers(hwnd);
                     break;
                 
                 case IDM_VIEW_SYNTAX: {

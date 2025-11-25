@@ -21,6 +21,7 @@
 #define IDM_VIEW_LINENUMBERS 261
 #define IDM_VIEW_SYNTAX      262
 #define IDM_VIEW_VIMMODE     263
+#define IDM_VIEW_RELATIVENUM 264
 #define IDM_HELP_ABOUT      301
 #define IDR_MAINMENU        1000
 #define IDR_ACCEL           1001
@@ -61,6 +62,7 @@ BEGIN
     POPUP "&View"
     BEGIN
         MENUITEM "&Line Numbers",           IDM_VIEW_LINENUMBERS
+        MENUITEM "&Relative Line Numbers",  IDM_VIEW_RELATIVENUM
         MENUITEM "&Syntax Highlighting",    IDM_VIEW_SYNTAX
         MENUITEM SEPARATOR
         MENUITEM "&Vim Mode\tCtrl+Shift+V", IDM_VIEW_VIMMODE

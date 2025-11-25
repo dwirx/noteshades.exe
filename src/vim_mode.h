@@ -8,7 +8,8 @@
 typedef enum {
     VIM_MODE_NORMAL = 0,    /* Normal mode - navigation */
     VIM_MODE_INSERT,        /* Insert mode - typing */
-    VIM_MODE_VISUAL,        /* Visual mode - selection */
+    VIM_MODE_VISUAL,        /* Visual mode - character selection */
+    VIM_MODE_VISUAL_LINE,   /* Visual Line mode - line selection (V) */
     VIM_MODE_COMMAND        /* Command mode - : commands */
 } VimModeState;
 
@@ -19,10 +20,12 @@ typedef struct {
     int nRepeatCount;           /* Repeat count for commands (e.g., 5j) */
     TCHAR chPendingOp;          /* Pending operator (d, y, c) */
     DWORD dwVisualStart;        /* Visual mode selection start */
+    int nVisualStartLine;       /* Visual line mode start line */
     TCHAR szCommandBuffer[64];  /* Command buffer for : commands */
     int nCommandLen;            /* Command buffer length */
     TCHAR szSearchPattern[256]; /* Last search pattern */
     BOOL bSearchForward;        /* Search direction */
+    int nDesiredCol;            /* Desired column for vertical movement */
 } VimState;
 
 /* Global vim state */
@@ -43,8 +46,7 @@ VimModeState GetVimModeState(void);
 /* Get vim mode string for status bar */
 const TCHAR* GetVimModeString(void);
 
-/* Process key input in vim mode
- * Returns TRUE if key was handled, FALSE to pass to default handler */
+/* Process key input in vim mode */
 BOOL ProcessVimKey(HWND hwndEdit, UINT msg, WPARAM wParam, LPARAM lParam);
 
 /* Vim navigation commands */
@@ -54,8 +56,10 @@ void VimMoveUp(HWND hwndEdit, int count);
 void VimMoveDown(HWND hwndEdit, int count);
 void VimMoveWordForward(HWND hwndEdit, int count);
 void VimMoveWordBackward(HWND hwndEdit, int count);
+void VimMoveWordEnd(HWND hwndEdit, int count);
 void VimMoveLineStart(HWND hwndEdit);
 void VimMoveLineEnd(HWND hwndEdit);
+void VimMoveFirstNonBlank(HWND hwndEdit);
 void VimMoveFirstLine(HWND hwndEdit);
 void VimMoveLastLine(HWND hwndEdit);
 void VimMoveToLine(HWND hwndEdit, int line);
@@ -73,6 +77,10 @@ void VimYankLine(HWND hwndEdit, int count);
 void VimPaste(HWND hwndEdit);
 void VimPasteBefore(HWND hwndEdit);
 void VimUndo(HWND hwndEdit);
+void VimRedo(HWND hwndEdit);
+void VimJoinLines(HWND hwndEdit);
+void VimIndentLine(HWND hwndEdit, int count);
+void VimUnindentLine(HWND hwndEdit, int count);
 
 /* Vim mode transitions */
 void VimEnterInsertMode(HWND hwndEdit);
@@ -82,6 +90,7 @@ void VimEnterInsertModeLineEnd(HWND hwndEdit);
 void VimEnterInsertModeNewLineBelow(HWND hwndEdit);
 void VimEnterInsertModeNewLineAbove(HWND hwndEdit);
 void VimEnterVisualMode(HWND hwndEdit);
+void VimEnterVisualLineMode(HWND hwndEdit);
 void VimEnterNormalMode(HWND hwndEdit);
 
 /* Search commands */

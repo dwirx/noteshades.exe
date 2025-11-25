@@ -28,6 +28,7 @@
 #define IDM_VIEW_LINENUMBERS 261
 #define IDM_VIEW_SYNTAX      262
 #define IDM_VIEW_VIMMODE     263
+#define IDM_VIEW_RELATIVENUM 264
 
 /* Help menu command IDs */
 #define IDM_HELP_ABOUT      301

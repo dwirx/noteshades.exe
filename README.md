@@ -6,7 +6,7 @@ A fast, lightweight text editor built with Win32 API featuring syntax highlighti
 
 - Multiple tabs support
 - Syntax highlighting for 20+ languages
-- Line numbers
+- Line numbers (absolute or relative)
 - Vim mode navigation (toggleable)
 - Find and Replace
 - Word wrap toggle
@@ -43,13 +43,14 @@ A fast, lightweight text editor built with Win32 API featuring syntax highlighti
 | Menu | Action |
 |------|--------|
 | View → Line Numbers | Toggle line numbers |
+| View → Relative Line Numbers | Toggle relative numbering (like Vim) |
 | View → Syntax Highlighting | Toggle syntax colors |
 | View → Vim Mode | Toggle Vim navigation |
 | Format → Word Wrap | Toggle word wrap |
 
 ## Vim Mode
 
-Enable via **View → Vim Mode**. Status bar shows current mode (NORMAL/INSERT/VISUAL).
+Enable via **View → Vim Mode**. Status bar shows current mode (NORMAL/INSERT/VISUAL/V-LINE).
 
 ### Normal Mode - Navigation
 | Key | Action |
@@ -58,14 +59,17 @@ Enable via **View → Vim Mode**. Status bar shows current mode (NORMAL/INSERT/V
 | j / ↓ | Move down |
 | k / ↑ | Move up |
 | l / → | Move right |
-| w | Next word |
-| b | Previous word |
+| w / W | Next word |
+| b / B | Previous word |
+| e | End of word |
 | 0 | Line start |
 | $ | Line end |
-| ^ | First non-blank |
+| ^ | First non-blank character |
 | gg | First line |
 | G | Last line |
 | {n}G | Go to line n |
+| Ctrl+D | Half page down |
+| Ctrl+U | Half page up |
 | Page Up/Down | Scroll page |
 
 ### Normal Mode - Editing
@@ -73,38 +77,66 @@ Enable via **View → Vim Mode**. Status bar shows current mode (NORMAL/INSERT/V
 |-----|--------|
 | x | Delete character |
 | X | Delete char before |
+| s | Delete char and insert |
+| S | Delete line and insert |
 | dd | Delete line |
 | dw | Delete word |
+| d$ | Delete to end of line |
+| d0 | Delete to start of line |
 | D | Delete to end of line |
+| cc | Change line |
+| cw | Change word |
+| C | Change to end of line |
 | yy | Yank (copy) line |
+| yw | Yank word |
 | Y | Yank line |
 | p | Paste after |
 | P | Paste before |
 | u | Undo |
-| cc | Change line |
-| cw | Change word |
-| C | Change to end of line |
+| Ctrl+R | Redo |
+| J | Join lines |
+| >> | Indent line |
+| << | Unindent line |
 
 ### Mode Transitions
 | Key | Action |
 |-----|--------|
 | i | Insert mode (at cursor) |
 | a | Insert mode (after cursor) |
-| I | Insert at line start |
+| I | Insert at first non-blank |
 | A | Insert at line end |
 | o | New line below |
 | O | New line above |
-| v | Visual mode |
+| v | Visual mode (character) |
+| V | Visual Line mode |
 | Esc | Return to Normal mode |
 
-### Visual Mode
+### Visual Mode (v)
 | Key | Action |
 |-----|--------|
 | h/j/k/l | Extend selection |
-| w/b | Extend by word |
+| w/b/e | Extend by word |
+| 0/$/^ | Extend to line start/end |
+| G | Extend to end of file |
 | d/x | Delete selection |
 | y | Yank selection |
 | c | Change selection |
+| > | Indent selection |
+| < | Unindent selection |
+| V | Switch to Visual Line |
+| Esc | Exit visual mode |
+
+### Visual Line Mode (V)
+| Key | Action |
+|-----|--------|
+| j/k | Extend selection by line |
+| G | Extend to end of file |
+| d/x | Delete lines |
+| y | Yank lines |
+| c | Change lines |
+| > | Indent lines |
+| < | Unindent lines |
+| v | Switch to Visual (char) |
 | Esc | Exit visual mode |
 
 ### Repeat Count
@@ -112,6 +144,7 @@ Prefix commands with a number to repeat:
 - `5j` - Move down 5 lines
 - `3dd` - Delete 3 lines
 - `10G` - Go to line 10
+- `2>>` - Indent 2 times
 
 ## Supported Languages
 

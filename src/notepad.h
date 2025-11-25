@@ -77,6 +77,7 @@ typedef struct {
     HACCEL hAccel;               /* Accelerator table handle */
     BOOL bWordWrap;              /* Word wrap enabled flag */
     BOOL bShowLineNumbers;       /* Global line numbers enabled flag */
+    BOOL bRelativeLineNumbers;   /* Relative line numbers enabled flag */
     int nTabCount;               /* Number of open tabs */
     int nCurrentTab;             /* Currently active tab index */
     TabState tabs[MAX_TABS];     /* Array of tab states */
@@ -148,6 +149,7 @@ TabState* GetCurrentTabState(void);
 HWND CreateLineNumberWindow(HWND hwndParent, HINSTANCE hInstance);
 void UpdateLineNumbers(HWND hwndLineNumbers, HWND hwndEdit);
 void ToggleLineNumbers(HWND hwnd);
+void ToggleRelativeLineNumbers(HWND hwnd);
 void SyncLineNumberScroll(HWND hwndLineNumbers, HWND hwndEdit);
 int CalculateLineNumberWidth(int nLineCount);
 LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
