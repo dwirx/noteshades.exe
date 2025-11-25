@@ -166,40 +166,70 @@ void VimMoveRight(HWND hwndEdit, int count) {
 }
 
 void VimMoveUp(HWND hwndEdit, int count) {
-    DWORD pos = GetEditCursorPos(hwndEdit);
-    int line = GetLineFromChar(hwndEdit, pos);
-    int col = g_VimState.nDesiredCol;
+    int line;
+    int col;
+    
+    /* In Visual Line mode, use tracked current line */
+    if (g_VimState.mode == VIM_MODE_VISUAL_LINE) {
+        line = g_VimState.nVisualCurrentLine;
+        col = 0;
+    } else {
+        DWORD pos = GetEditCursorPos(hwndEdit);
+        line = GetLineFromChar(hwndEdit, pos);
+        DWORD lineStart = GetLineIndex(hwndEdit, line);
+        int currentCol = (int)(pos - lineStart);
+        col = (g_VimState.nDesiredCol > 0) ? g_VimState.nDesiredCol : currentCol;
+    }
     
     int newLine = (line > count) ? line - count : 0;
-    DWORD newLineStart = GetLineIndex(hwndEdit, newLine);
-    int newLineLen = GetLineLen(hwndEdit, newLine);
-    DWORD newPos = newLineStart + ((col < newLineLen) ? col : newLineLen);
     
-    if (g_VimState.mode == VIM_MODE_VISUAL) {
-        UpdateVisualSelection(hwndEdit, newPos);
-    } else if (g_VimState.mode == VIM_MODE_VISUAL_LINE) {
+    if (g_VimState.mode == VIM_MODE_VISUAL_LINE) {
+        g_VimState.nVisualCurrentLine = newLine;
         UpdateVisualLineSelection(hwndEdit, newLine);
+    } else if (g_VimState.mode == VIM_MODE_VISUAL) {
+        DWORD newLineStart = GetLineIndex(hwndEdit, newLine);
+        int newLineLen = GetLineLen(hwndEdit, newLine);
+        DWORD newPos = newLineStart + ((col < newLineLen) ? col : newLineLen);
+        UpdateVisualSelection(hwndEdit, newPos);
     } else {
+        DWORD newLineStart = GetLineIndex(hwndEdit, newLine);
+        int newLineLen = GetLineLen(hwndEdit, newLine);
+        DWORD newPos = newLineStart + ((col < newLineLen) ? col : newLineLen);
         SetEditCursorPos(hwndEdit, newPos);
     }
 }
 
 void VimMoveDown(HWND hwndEdit, int count) {
-    DWORD pos = GetEditCursorPos(hwndEdit);
-    int line = GetLineFromChar(hwndEdit, pos);
-    int col = g_VimState.nDesiredCol;
+    int line;
+    int col;
     int totalLines = GetLineCount(hwndEdit);
     
-    int newLine = (line + count < totalLines) ? line + count : totalLines - 1;
-    DWORD newLineStart = GetLineIndex(hwndEdit, newLine);
-    int newLineLen = GetLineLen(hwndEdit, newLine);
-    DWORD newPos = newLineStart + ((col < newLineLen) ? col : newLineLen);
-    
-    if (g_VimState.mode == VIM_MODE_VISUAL) {
-        UpdateVisualSelection(hwndEdit, newPos);
-    } else if (g_VimState.mode == VIM_MODE_VISUAL_LINE) {
-        UpdateVisualLineSelection(hwndEdit, newLine);
+    /* In Visual Line mode, use tracked current line */
+    if (g_VimState.mode == VIM_MODE_VISUAL_LINE) {
+        line = g_VimState.nVisualCurrentLine;
+        col = 0;
     } else {
+        DWORD pos = GetEditCursorPos(hwndEdit);
+        line = GetLineFromChar(hwndEdit, pos);
+        DWORD lineStart = GetLineIndex(hwndEdit, line);
+        int currentCol = (int)(pos - lineStart);
+        col = (g_VimState.nDesiredCol > 0) ? g_VimState.nDesiredCol : currentCol;
+    }
+    
+    int newLine = (line + count < totalLines) ? line + count : totalLines - 1;
+    
+    if (g_VimState.mode == VIM_MODE_VISUAL_LINE) {
+        g_VimState.nVisualCurrentLine = newLine;
+        UpdateVisualLineSelection(hwndEdit, newLine);
+    } else if (g_VimState.mode == VIM_MODE_VISUAL) {
+        DWORD newLineStart = GetLineIndex(hwndEdit, newLine);
+        int newLineLen = GetLineLen(hwndEdit, newLine);
+        DWORD newPos = newLineStart + ((col < newLineLen) ? col : newLineLen);
+        UpdateVisualSelection(hwndEdit, newPos);
+    } else {
+        DWORD newLineStart = GetLineIndex(hwndEdit, newLine);
+        int newLineLen = GetLineLen(hwndEdit, newLine);
+        DWORD newPos = newLineStart + ((col < newLineLen) ? col : newLineLen);
         SetEditCursorPos(hwndEdit, newPos);
     }
 }
@@ -268,6 +298,7 @@ void VimMoveFirstLine(HWND hwndEdit) {
     if (g_VimState.mode == VIM_MODE_VISUAL) {
         UpdateVisualSelection(hwndEdit, 0);
     } else if (g_VimState.mode == VIM_MODE_VISUAL_LINE) {
+        g_VimState.nVisualCurrentLine = 0;
         UpdateVisualLineSelection(hwndEdit, 0);
     } else {
         SetEditCursorPos(hwndEdit, 0);
@@ -282,6 +313,7 @@ void VimMoveLastLine(HWND hwndEdit) {
     if (g_VimState.mode == VIM_MODE_VISUAL) {
         UpdateVisualSelection(hwndEdit, newPos);
     } else if (g_VimState.mode == VIM_MODE_VISUAL_LINE) {
+        g_VimState.nVisualCurrentLine = totalLines - 1;
         UpdateVisualLineSelection(hwndEdit, totalLines - 1);
     } else {
         SetEditCursorPos(hwndEdit, newPos);
@@ -298,6 +330,7 @@ void VimMoveToLine(HWND hwndEdit, int line) {
     if (g_VimState.mode == VIM_MODE_VISUAL) {
         UpdateVisualSelection(hwndEdit, newPos);
     } else if (g_VimState.mode == VIM_MODE_VISUAL_LINE) {
+        g_VimState.nVisualCurrentLine = line - 1;
         UpdateVisualLineSelection(hwndEdit, line - 1);
     } else {
         SetEditCursorPos(hwndEdit, newPos);
@@ -631,8 +664,9 @@ void VimEnterVisualLineMode(HWND hwndEdit) {
     g_VimState.mode = VIM_MODE_VISUAL_LINE;
     DWORD pos = GetEditCursorPos(hwndEdit);
     g_VimState.nVisualStartLine = GetLineFromChar(hwndEdit, pos);
+    g_VimState.nVisualCurrentLine = g_VimState.nVisualStartLine;
     g_VimState.dwVisualStart = GetLineIndex(hwndEdit, g_VimState.nVisualStartLine);
-    UpdateVisualLineSelection(hwndEdit, g_VimState.nVisualStartLine);
+    UpdateVisualLineSelection(hwndEdit, g_VimState.nVisualCurrentLine);
 }
 
 void VimEnterNormalMode(HWND hwndEdit) {
@@ -641,6 +675,11 @@ void VimEnterNormalMode(HWND hwndEdit) {
     g_VimState.chPendingOp = 0;
     DWORD pos = GetEditCursorPos(hwndEdit);
     SetEditCursorPos(hwndEdit, pos);
+    
+    /* Set desired column to current position */
+    int line = GetLineFromChar(hwndEdit, pos);
+    DWORD lineStart = GetLineIndex(hwndEdit, line);
+    g_VimState.nDesiredCol = (int)(pos - lineStart);
 }
 
 /* ============ Search Functions ============ */
@@ -751,34 +790,45 @@ BOOL ProcessVimKey(HWND hwndEdit, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (msg == WM_CHAR) {
         TCHAR ch = (TCHAR)wParam;
         
+        /* Handle pending operator in visual modes */
+        if (g_VimState.chPendingOp && (g_VimState.mode == VIM_MODE_VISUAL || g_VimState.mode == VIM_MODE_VISUAL_LINE)) {
+            if (g_VimState.chPendingOp == TEXT('g') && ch == TEXT('g')) {
+                VimMoveFirstLine(hwndEdit);
+                g_VimState.chPendingOp = 0;
+                return TRUE;
+            }
+            g_VimState.chPendingOp = 0;
+        }
+        
         /* Visual Line mode commands */
         if (g_VimState.mode == VIM_MODE_VISUAL_LINE) {
-            int currentLine = GetLineFromChar(hwndEdit, GetEditCursorPos(hwndEdit));
             switch (ch) {
+                /* Navigation - all work in V-LINE mode */
+                case TEXT('h'): VimMoveLeft(hwndEdit, count); return TRUE;
+                case TEXT('l'): VimMoveRight(hwndEdit, count); return TRUE;
                 case TEXT('j'): VimMoveDown(hwndEdit, count); return TRUE;
                 case TEXT('k'): VimMoveUp(hwndEdit, count); return TRUE;
+                case TEXT('w'): VimMoveWordForward(hwndEdit, count); return TRUE;
+                case TEXT('b'): VimMoveWordBackward(hwndEdit, count); return TRUE;
+                case TEXT('e'): VimMoveWordEnd(hwndEdit, count); return TRUE;
+                case TEXT('0'): VimMoveLineStart(hwndEdit); return TRUE;
+                case TEXT('$'): VimMoveLineEnd(hwndEdit); return TRUE;
+                case TEXT('^'): VimMoveFirstNonBlank(hwndEdit); return TRUE;
                 case TEXT('G'): VimMoveLastLine(hwndEdit); return TRUE;
+                case TEXT('g'): g_VimState.chPendingOp = TEXT('g'); return TRUE;
+                /* Edit operations */
                 case TEXT('d'):
                 case TEXT('x'): VimVisualDelete(hwndEdit); return TRUE;
                 case TEXT('y'): VimVisualYank(hwndEdit); return TRUE;
                 case TEXT('c'): VimVisualChange(hwndEdit); return TRUE;
-                case TEXT('>'): /* Indent */
-                    VimIndentLine(hwndEdit, count);
-                    VimEnterNormalMode(hwndEdit);
-                    return TRUE;
-                case TEXT('<'): /* Unindent */
-                    VimUnindentLine(hwndEdit, count);
-                    VimEnterNormalMode(hwndEdit);
-                    return TRUE;
+                case TEXT('>'): VimIndentLine(hwndEdit, count); VimEnterNormalMode(hwndEdit); return TRUE;
+                case TEXT('<'): VimUnindentLine(hwndEdit, count); VimEnterNormalMode(hwndEdit); return TRUE;
                 case TEXT('v'): /* Switch to character visual */
                     g_VimState.mode = VIM_MODE_VISUAL;
                     g_VimState.dwVisualStart = GetLineIndex(hwndEdit, g_VimState.nVisualStartLine);
                     return TRUE;
-                case 27: /* Escape */
-                    VimEnterNormalMode(hwndEdit);
-                    return TRUE;
-                default:
-                    return TRUE; /* Block other keys */
+                case 27: VimEnterNormalMode(hwndEdit); return TRUE;
+                default: return TRUE;
             }
         }
         
@@ -796,6 +846,7 @@ BOOL ProcessVimKey(HWND hwndEdit, UINT msg, WPARAM wParam, LPARAM lParam) {
                 case TEXT('$'): VimMoveLineEnd(hwndEdit); return TRUE;
                 case TEXT('^'): VimMoveFirstNonBlank(hwndEdit); return TRUE;
                 case TEXT('G'): VimMoveLastLine(hwndEdit); return TRUE;
+                case TEXT('g'): g_VimState.chPendingOp = TEXT('g'); return TRUE;
                 case TEXT('d'):
                 case TEXT('x'): VimVisualDelete(hwndEdit); return TRUE;
                 case TEXT('y'): VimVisualYank(hwndEdit); return TRUE;

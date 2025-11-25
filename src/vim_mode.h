@@ -21,6 +21,7 @@ typedef struct {
     TCHAR chPendingOp;          /* Pending operator (d, y, c) */
     DWORD dwVisualStart;        /* Visual mode selection start */
     int nVisualStartLine;       /* Visual line mode start line */
+    int nVisualCurrentLine;     /* Visual line mode current line */
     TCHAR szCommandBuffer[64];  /* Command buffer for : commands */
     int nCommandLen;            /* Command buffer length */
     TCHAR szSearchPattern[256]; /* Last search pattern */
