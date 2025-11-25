@@ -1,4 +1,5 @@
 #include "notepad.h"
+#include "session.h"
 
 /* Line number window class name */
 static const TCHAR szLineNumClassName[] = TEXT("LineNumberWindow");
@@ -322,6 +323,9 @@ void ToggleRelativeLineNumbers(HWND hwnd) {
     if (pTab && pTab->lineNumState.hwndLineNumbers && g_AppState.bShowLineNumbers) {
         InvalidateRect(pTab->lineNumState.hwndLineNumbers, NULL, TRUE);
     }
+    
+    /* Mark session dirty */
+    MarkSessionDirty();
 }
 
 /* Toggle line numbers visibility */
@@ -364,6 +368,9 @@ void ToggleLineNumbers(HWND hwnd) {
     
     /* Reposition controls */
     RepositionControls(hwnd);
+    
+    /* Mark session dirty */
+    MarkSessionDirty();
 }
 
 /* Tab control height - must match main.c */

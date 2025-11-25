@@ -1,5 +1,6 @@
 #include "vim_mode.h"
 #include "notepad.h"
+#include "session.h"
 #include <richedit.h>
 
 /* Global vim state */
@@ -39,6 +40,9 @@ void ToggleVimMode(HWND hwnd) {
     HMENU hMenu = GetMenu(hwnd);
     CheckMenuItem(hMenu, IDM_VIEW_VIMMODE, 
                   g_VimState.bEnabled ? MF_CHECKED : MF_UNCHECKED);
+    
+    /* Mark session dirty to save vim mode state */
+    MarkSessionDirty();
 }
 
 BOOL IsVimModeEnabled(void) { return g_VimState.bEnabled; }

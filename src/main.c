@@ -836,6 +836,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                             SetupSyntaxHighlighting(pTab->hwndEdit, LANG_NONE);
                         }
                     }
+                    /* Mark session dirty to save syntax highlight state */
+                    MarkSessionDirty();
                     break;
                 }
                 
@@ -992,6 +994,9 @@ void ToggleWordWrap(HWND hwnd) {
     if (g_AppState.nCurrentTab >= 0) {
         RecreateEditControl(hwnd, g_AppState.nCurrentTab, g_AppState.bWordWrap);
     }
+    
+    /* Mark session dirty */
+    MarkSessionDirty();
 }
 
 /* Recreate edit control with word wrap setting */

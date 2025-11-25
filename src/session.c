@@ -5,6 +5,8 @@
 
 #include "session.h"
 #include "notepad.h"
+#include "vim_mode.h"
+#include "syntax.h"
 #include <shlobj.h>
 #include <stdio.h>
 
@@ -80,6 +82,8 @@ static BOOL WriteJsonToFile(const TCHAR* szPath, SessionData* pSession) {
     fprintf(fp, "  \"wordWrap\": %s,\n", pSession->bWordWrap ? "true" : "false");
     fprintf(fp, "  \"showLineNumbers\": %s,\n", pSession->bShowLineNumbers ? "true" : "false");
     fprintf(fp, "  \"relativeLineNumbers\": %s,\n", pSession->bRelativeLineNumbers ? "true" : "false");
+    fprintf(fp, "  \"vimMode\": %s,\n", pSession->bVimMode ? "true" : "false");
+    fprintf(fp, "  \"syntaxHighlight\": %s,\n", pSession->bSyntaxHighlight ? "true" : "false");
     fprintf(fp, "  \"window\": {\n");
     fprintf(fp, "    \"x\": %d,\n", pSession->nWindowX);
     fprintf(fp, "    \"y\": %d,\n", pSession->nWindowY);
@@ -237,6 +241,24 @@ static BOOL ReadJsonFromFile(const TCHAR* szPath, SessionData* pSession) {
         pSession->bRelativeLineNumbers = ParseBool(p);
     }
     
+    /* Parse vimMode */
+    p = pBuffer;
+    p = strstr(p, "\"vimMode\"");
+    if (p) {
+        p = FindChar(p, ':');
+        p = SkipWhitespace(p + 1);
+        pSession->bVimMode = ParseBool(p);
+    }
+    
+    /* Parse syntaxHighlight */
+    p = pBuffer;
+    p = strstr(p, "\"syntaxHighlight\"");
+    if (p) {
+        p = FindChar(p, ':');
+        p = SkipWhitespace(p + 1);
+        pSession->bSyntaxHighlight = ParseBool(p);
+    }
+    
     /* Parse window settings */
     p = pBuffer;
     p = strstr(p, "\"window\"");
@@ -385,6 +407,8 @@ BOOL SaveSession(HWND hwnd) {
     session.bWordWrap = g_AppState.bWordWrap;
     session.bShowLineNumbers = g_AppState.bShowLineNumbers;
     session.bRelativeLineNumbers = g_AppState.bRelativeLineNumbers;
+    session.bVimMode = IsVimModeEnabled();
+    session.bSyntaxHighlight = g_bSyntaxHighlight;
     
     /* Get window position and size */
     wp.length = sizeof(WINDOWPLACEMENT);
@@ -469,11 +493,26 @@ BOOL LoadSession(HWND hwnd) {
     g_AppState.bShowLineNumbers = session.bShowLineNumbers;
     g_AppState.bRelativeLineNumbers = session.bRelativeLineNumbers;
     
+    /* Apply vim mode setting */
+    if (session.bVimMode && !IsVimModeEnabled()) {
+        /* Enable vim mode without toggling (direct set) */
+        g_VimState.bEnabled = TRUE;
+        g_VimState.mode = VIM_MODE_NORMAL;
+        g_VimState.hwndMain = hwnd;
+    } else if (!session.bVimMode && IsVimModeEnabled()) {
+        g_VimState.bEnabled = FALSE;
+    }
+    
+    /* Apply syntax highlighting setting */
+    g_bSyntaxHighlight = session.bSyntaxHighlight;
+    
     /* Update menu check marks */
     HMENU hMenu = GetMenu(hwnd);
     CheckMenuItem(hMenu, IDM_FORMAT_WORDWRAP, session.bWordWrap ? MF_CHECKED : MF_UNCHECKED);
     CheckMenuItem(hMenu, IDM_VIEW_LINENUMBERS, session.bShowLineNumbers ? MF_CHECKED : MF_UNCHECKED);
     CheckMenuItem(hMenu, IDM_VIEW_RELATIVENUM, session.bRelativeLineNumbers ? MF_CHECKED : MF_UNCHECKED);
+    CheckMenuItem(hMenu, IDM_VIEW_VIMMODE, session.bVimMode ? MF_CHECKED : MF_UNCHECKED);
+    CheckMenuItem(hMenu, IDM_VIEW_SYNTAX, session.bSyntaxHighlight ? MF_CHECKED : MF_UNCHECKED);
     
     /* Close default tab created at startup */
     if (g_AppState.nTabCount == 1 && g_AppState.tabs[0].bUntitled && !g_AppState.tabs[0].bModified) {

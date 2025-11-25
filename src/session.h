@@ -31,6 +31,8 @@ typedef struct {
     BOOL bWordWrap;              /* Word wrap enabled */
     BOOL bShowLineNumbers;       /* Line numbers enabled */
     BOOL bRelativeLineNumbers;   /* Relative line numbers enabled */
+    BOOL bVimMode;               /* Vim mode enabled */
+    BOOL bSyntaxHighlight;       /* Syntax highlighting enabled */
     int nWindowX;                /* Window X position */
     int nWindowY;                /* Window Y position */
     int nWindowWidth;            /* Window width */
