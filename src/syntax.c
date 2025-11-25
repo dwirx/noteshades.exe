@@ -346,18 +346,16 @@ static void GetCommentStyle(LanguageType lang, WCHAR* lineComment, WCHAR* blockS
 void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang) {
     if (!hwndEdit || !g_bSyntaxHighlight || lang == LANG_NONE) return;
     
-    /* Disable redraw for performance */
-    SendMessage(hwndEdit, WM_SETREDRAW, FALSE, 0);
-    
     /* Get text length */
     int nLen = GetWindowTextLengthW(hwndEdit);
-    if (nLen == 0) {
-        SendMessage(hwndEdit, WM_SETREDRAW, TRUE, 0);
-        return;
-    }
+    if (nLen == 0) return;
     
-    /* Limit highlighting to first 50KB for performance */
-    if (nLen > 50000) nLen = 50000;
+    /* Limit highlighting to first 20KB for better performance */
+    /* Files larger than this will only have partial highlighting */
+    if (nLen > 20000) nLen = 20000;
+    
+    /* Disable redraw for performance */
+    SendMessage(hwndEdit, WM_SETREDRAW, FALSE, 0);
     
     /* Allocate buffer */
     WCHAR* pText = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, (nLen + 1) * sizeof(WCHAR));

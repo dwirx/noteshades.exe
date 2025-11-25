@@ -46,11 +46,11 @@ int CalculateLineNumberWidth(int nLineCount) {
         n /= 10;
     }
     
-    /* Minimum 2 digits width */
-    if (nDigits < 2) nDigits = 2;
+    /* Minimum 3 digits width for better appearance */
+    if (nDigits < 3) nDigits = 3;
     
-    /* Character width ~8 pixels for Consolas 16pt, plus padding for right margin */
-    return (nDigits * 8) + 16;
+    /* Character width ~9 pixels for Consolas 16pt, plus padding */
+    return (nDigits * 9) + 20;
 }
 
 
@@ -61,11 +61,7 @@ static int GetEditLineCount(HWND hwndEdit) {
     return (nLines > 0) ? nLines : 1;
 }
 
-/* Get first visible line in edit control */
-static int GetFirstVisibleLine(HWND hwndEdit) {
-    if (!hwndEdit) return 0;
-    return (int)SendMessage(hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
-}
+
 
 /* Create line number window */
 HWND CreateLineNumberWindow(HWND hwndParent, HINSTANCE hInstance) {
@@ -88,58 +84,7 @@ HWND CreateLineNumberWindow(HWND hwndParent, HINSTANCE hInstance) {
     return hwndLineNum;
 }
 
-/* Count logical lines (based on newline characters) */
-static int CountLogicalLines(HWND hwndEdit) {
-    int nTextLen = GetWindowTextLength(hwndEdit);
-    if (nTextLen == 0) return 1;
-    
-    /* For performance, use EM_GETLINECOUNT for non-wrapped mode */
-    /* In wrapped mode, we need to count actual newlines */
-    int nLines = 1;
-    
-    /* Get text and count newlines */
-    TCHAR* pText = (TCHAR*)HeapAlloc(GetProcessHeap(), 0, (nTextLen + 1) * sizeof(TCHAR));
-    if (pText) {
-        GetWindowText(hwndEdit, pText, nTextLen + 1);
-        for (int i = 0; i < nTextLen; i++) {
-            if (pText[i] == TEXT('\n')) {
-                nLines++;
-            }
-        }
-        HeapFree(GetProcessHeap(), 0, pText);
-    }
-    
-    return nLines;
-}
 
-/* Get character index for logical line (counting newlines) */
-static int GetLogicalLineCharIndex(HWND hwndEdit, int nLogicalLine) {
-    if (nLogicalLine == 0) return 0;
-    
-    int nTextLen = GetWindowTextLength(hwndEdit);
-    if (nTextLen == 0) return 0;
-    
-    TCHAR* pText = (TCHAR*)HeapAlloc(GetProcessHeap(), 0, (nTextLen + 1) * sizeof(TCHAR));
-    if (!pText) return 0;
-    
-    GetWindowText(hwndEdit, pText, nTextLen + 1);
-    
-    int nCurrentLine = 0;
-    int nCharIndex = 0;
-    
-    for (int i = 0; i < nTextLen && nCurrentLine < nLogicalLine; i++) {
-        if (pText[i] == TEXT('\n')) {
-            nCurrentLine++;
-            if (nCurrentLine == nLogicalLine) {
-                nCharIndex = i + 1;
-                break;
-            }
-        }
-    }
-    
-    HeapFree(GetProcessHeap(), 0, pText);
-    return nCharIndex;
-}
 
 /* Line number window procedure */
 LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -171,8 +116,8 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             HBITMAP hBitmap = CreateCompatibleBitmap(hdcScreen, nWidth, nHeight);
             HBITMAP hOldBitmap = (HBITMAP)SelectObject(hdc, hBitmap);
             
-            /* Fill background with white (like Notepad++) */
-            HBRUSH hBrush = CreateSolidBrush(RGB(255, 255, 255));
+            /* Fill background with light gray */
+            HBRUSH hBrush = CreateSolidBrush(RGB(240, 240, 240));
             FillRect(hdc, &rcClient, hBrush);
             DeleteObject(hBrush);
             
@@ -196,46 +141,50 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             GetTextMetrics(hdc, &tm);
             int nLineHeight = tm.tmHeight;
             
-            /* Get total logical lines (based on newlines, not visual wrapping) */
-            int nTotalLines = CountLogicalLines(hwndEdit);
+            /* Get first visible line and total line count */
+            int nFirstVisible = (int)SendMessage(hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
+            int nTotalLines = (int)SendMessage(hwndEdit, EM_GETLINECOUNT, 0, 0);
+            if (nTotalLines < 1) nTotalLines = 1;
             
-            /* Set text properties - dark gray like Notepad++ */
+            /* Calculate how many lines can fit in visible area */
+            int nVisibleLines = (nHeight / nLineHeight) + 2;
+            
+            /* Set text properties - dark gray */
             SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, RGB(80, 80, 80));
+            SetTextColor(hdc, RGB(100, 100, 100));
             
             TCHAR szLineNum[16];
             RECT rcLine;
-            rcLine.left = 0;
-            rcLine.right = rcClient.right - 6;
+            rcLine.left = 4;
+            rcLine.right = rcClient.right - 8;
             
-            /* Track last Y position to avoid drawing at same position */
-            int nLastY = -10000;
-            
-            for (int nLine = 0; nLine < nTotalLines; nLine++) {
-                /* Get character index at start of this logical line */
-                int nCharIndex = GetLogicalLineCharIndex(hwndEdit, nLine);
+            /* Draw line numbers for visible lines - get actual Y position from edit control */
+            for (int i = 0; i < nVisibleLines; i++) {
+                int nLine = nFirstVisible + i;
+                int nLineNum = nLine + 1; /* 1-based line number */
                 
-                /* Get Y position of this character */
+                /* Stop if we've passed the last line */
+                if (nLineNum > nTotalLines) break;
+                
+                /* Get character index at start of this line */
+                int nCharIndex = (int)SendMessage(hwndEdit, EM_LINEINDEX, nLine, 0);
+                if (nCharIndex < 0) break;
+                
+                /* Get Y position of this character from edit control */
                 LRESULT lPos = SendMessage(hwndEdit, EM_POSFROMCHAR, nCharIndex, 0);
+                int nY = (short)HIWORD(lPos);
                 
-                /* Extract Y coordinate - handle as signed short for proper negative values */
-                short nY = (short)HIWORD(lPos);
-                
-                /* Skip if line is above visible area (scrolled past) */
+                /* Skip if line is above visible area */
                 if (nY < -nLineHeight) continue;
                 
                 /* Stop if line is below visible area */
                 if (nY > nHeight) break;
                 
-                /* Skip if same Y position as last line */
-                if (nY == nLastY) continue;
-                nLastY = nY;
+                /* Draw line number at the exact Y position */
+                rcLine.top = nY;
+                rcLine.bottom = nY + nLineHeight;
                 
-                /* Draw line number at correct Y position - align with text baseline */
-                rcLine.top = (int)nY;
-                rcLine.bottom = rcLine.top + nLineHeight;
-                
-                _sntprintf(szLineNum, 16, TEXT("%d"), nLine + 1);
+                _sntprintf(szLineNum, 16, TEXT("%d"), nLineNum);
                 DrawText(hdc, szLineNum, -1, &rcLine, DT_RIGHT | DT_TOP | DT_SINGLELINE);
             }
             
@@ -406,7 +355,7 @@ void RepositionControls(HWND hwnd) {
         int nLineNumWidth = pTab->lineNumState.nLineNumberWidth;
         if (nLineNumWidth <= 0) nLineNumWidth = DEFAULT_LINE_NUM_WIDTH;
         
-        /* Position and show line number window */
+        /* Position line number window at same position as edit control */
         hdwp = DeferWindowPos(hdwp, pTab->lineNumState.hwndLineNumbers, NULL,
                    0, nTabHeight, 
                    nLineNumWidth, nEditAreaHeight, 
