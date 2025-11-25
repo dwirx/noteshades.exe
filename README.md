@@ -21,7 +21,15 @@ A fast, lightweight text editor built with Win32 API featuring syntax highlighti
 | Ctrl+T | New tab |
 | Ctrl+O | Open file |
 | Ctrl+S | Save file |
+| Ctrl+Shift+S | Save As |
 | Ctrl+W | Close tab |
+
+### Tab Navigation
+| Shortcut | Action |
+|----------|--------|
+| Ctrl+Tab | Next tab |
+| Ctrl+Shift+Tab | Previous tab |
+| Ctrl+1-9 | Go to tab 1-9 |
 
 ### Edit Operations
 | Shortcut | Action |
@@ -31,22 +39,32 @@ A fast, lightweight text editor built with Win32 API featuring syntax highlighti
 | Ctrl+C | Copy |
 | Ctrl+V | Paste |
 | Ctrl+A | Select all |
+| Ctrl+D | Duplicate line |
+| Ctrl+Shift+K | Delete line |
+| Alt+Up | Move line up |
+| Alt+Down | Move line down |
+| Ctrl+/ | Toggle comment |
+| Tab | Indent |
+| Shift+Tab | Unindent |
 
-### Find & Replace
+### Find & Navigation
 | Shortcut | Action |
 |----------|--------|
 | Ctrl+F | Find |
 | Ctrl+H | Find and Replace |
 | F3 | Find next |
+| Ctrl+G | Go to line |
 
 ### View Options
-| Menu | Action |
-|------|--------|
-| View → Line Numbers | Toggle line numbers |
-| View → Relative Line Numbers | Toggle relative numbering (like Vim) |
-| View → Syntax Highlighting | Toggle syntax colors |
-| View → Vim Mode | Toggle Vim navigation |
-| Format → Word Wrap | Toggle word wrap |
+| Shortcut | Action |
+|----------|--------|
+| Ctrl+L | Toggle line numbers |
+| Ctrl++ | Zoom in |
+| Ctrl+- | Zoom out |
+| Ctrl+0 | Reset zoom |
+| Alt+Z | Toggle word wrap |
+| Ctrl+Shift+V | Toggle Vim mode |
+| F1 | Help / Shortcuts |
 
 ## Vim Mode
 

@@ -72,6 +72,35 @@
 /* Timer IDs */
 #define TIMER_STATUSBAR     4
 
+/* Tab navigation command IDs */
+#define IDM_TAB_NEXT        108
+#define IDM_TAB_PREV        109
+#define IDM_TAB_1           110
+#define IDM_TAB_2           111
+#define IDM_TAB_3           112
+#define IDM_TAB_4           113
+#define IDM_TAB_5           114
+#define IDM_TAB_6           115
+#define IDM_TAB_7           116
+#define IDM_TAB_8           117
+#define IDM_TAB_9           118
+
+/* Edit extended command IDs */
+#define IDM_EDIT_GOTOLINE       209
+#define IDM_EDIT_DUPLICATELINE  210
+#define IDM_EDIT_DELETELINE     211
+#define IDM_EDIT_MOVELINEUP     212
+#define IDM_EDIT_MOVELINEDOWN   213
+#define IDM_EDIT_TOGGLECOMMENT  214
+#define IDM_EDIT_INDENT         215
+#define IDM_EDIT_UNINDENT       216
+
+/* View extended command IDs */
+#define IDM_VIEW_ZOOMIN     265
+#define IDM_VIEW_ZOOMOUT    266
+#define IDM_VIEW_ZOOMRESET  267
+#define IDM_VIEW_FULLSCREEN 268
+
 /* Find/Replace dialog IDs */
 #define IDD_FINDREPLACE     500
 #define IDC_FIND_TEXT       501
@@ -81,6 +110,11 @@
 #define IDC_REPLACE_ALL     505
 #define IDC_MATCH_CASE      506
 #define IDC_WHOLE_WORD      507
+
+/* Go to Line dialog IDs */
+#define IDD_GOTOLINE        550
+#define IDC_GOTOLINE_EDIT   551
+#define IDC_GOTOLINE_INFO   552
 
 /* Help dialog ID */
 #define IDD_HELP            600

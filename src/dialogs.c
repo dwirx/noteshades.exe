@@ -395,3 +395,71 @@ INT_PTR CALLBACK HelpDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) 
 void ShowHelpDialog(HWND hwnd) {
     DialogBox(g_AppState.hInstance, MAKEINTRESOURCE(IDD_HELP), hwnd, HelpDlgProc);
 }
+
+/* Go to Line Dialog */
+INT_PTR CALLBACK GoToLineDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
+    (void)lParam;
+    switch (msg) {
+        case WM_INITDIALOG: {
+            /* Center dialog */
+            RECT rcOwner, rcDlg;
+            GetWindowRect(GetParent(hDlg), &rcOwner);
+            GetWindowRect(hDlg, &rcDlg);
+            SetWindowPos(hDlg, NULL, 
+                         rcOwner.left + (rcOwner.right - rcOwner.left - (rcDlg.right - rcDlg.left)) / 2,
+                         rcOwner.top + (rcOwner.bottom - rcOwner.top - (rcDlg.bottom - rcDlg.top)) / 2, 
+                         0, 0, SWP_NOSIZE | SWP_NOZORDER);
+            
+            /* Show current line info */
+            HWND hwndEdit = GetCurrentEdit();
+            if (hwndEdit) {
+                int nTotalLines = (int)SendMessage(hwndEdit, EM_GETLINECOUNT, 0, 0);
+                DWORD dwStart, dwEnd;
+                SendMessage(hwndEdit, EM_GETSEL, (WPARAM)&dwStart, (LPARAM)&dwEnd);
+                int nCurrentLine = (int)SendMessage(hwndEdit, EM_LINEFROMCHAR, dwStart, 0) + 1;
+                
+                TCHAR szInfo[128];
+                _sntprintf(szInfo, 128, TEXT("Line %d of %d"), nCurrentLine, nTotalLines);
+                SetDlgItemText(hDlg, IDC_GOTOLINE_INFO, szInfo);
+                
+                /* Set current line as default */
+                SetDlgItemInt(hDlg, IDC_GOTOLINE_EDIT, nCurrentLine, FALSE);
+            }
+            
+            /* Select all text in edit box */
+            HWND hwndLineEdit = GetDlgItem(hDlg, IDC_GOTOLINE_EDIT);
+            SendMessage(hwndLineEdit, EM_SETSEL, 0, -1);
+            SetFocus(hwndLineEdit);
+            return FALSE;
+        }
+        case WM_COMMAND:
+            switch (LOWORD(wParam)) {
+                case IDOK: {
+                    BOOL bTranslated;
+                    int nLine = GetDlgItemInt(hDlg, IDC_GOTOLINE_EDIT, &bTranslated, FALSE);
+                    if (bTranslated && nLine > 0) {
+                        HWND hwndEdit = GetCurrentEdit();
+                        if (hwndEdit) {
+                            EditGoToLine(hwndEdit, nLine);
+                        }
+                        EndDialog(hDlg, IDOK);
+                    } else {
+                        MessageBox(hDlg, TEXT("Please enter a valid line number."), TEXT("Go to Line"), MB_OK | MB_ICONWARNING);
+                        HWND hwndLineEdit = GetDlgItem(hDlg, IDC_GOTOLINE_EDIT);
+                        SetFocus(hwndLineEdit);
+                        SendMessage(hwndLineEdit, EM_SETSEL, 0, -1);
+                    }
+                    return TRUE;
+                }
+                case IDCANCEL:
+                    EndDialog(hDlg, IDCANCEL);
+                    return TRUE;
+            }
+            break;
+    }
+    return FALSE;
+}
+
+void ShowGoToLineDialog(HWND hwnd) {
+    DialogBox(g_AppState.hInstance, MAKEINTRESOURCE(IDD_GOTOLINE), hwnd, GoToLineDlgProc);
+}

@@ -106,6 +106,23 @@ void EditCopy(HWND hEdit);
 void EditPaste(HWND hEdit);
 void EditSelectAll(HWND hEdit);
 
+/* Extended edit operations */
+void EditDuplicateLine(HWND hEdit);
+void EditDeleteLine(HWND hEdit);
+void EditMoveLineUp(HWND hEdit);
+void EditMoveLineDown(HWND hEdit);
+void EditToggleComment(HWND hEdit);
+void EditIndent(HWND hEdit);
+void EditUnindent(HWND hEdit);
+void EditGoToLine(HWND hEdit, int nLine);
+
+/* Zoom operations */
+int GetZoomLevel(void);
+void SetZoomLevel(HWND hwnd, int nLevel);
+void ZoomIn(HWND hwnd);
+void ZoomOut(HWND hwnd);
+void ZoomReset(HWND hwnd);
+
 /* Dialog operations */
 BOOL ShowOpenDialog(HWND hwnd, TCHAR* szFileName, DWORD nMaxFile);
 BOOL ShowSaveDialog(HWND hwnd, TCHAR* szFileName, DWORD nMaxFile);
@@ -125,6 +142,10 @@ INT_PTR CALLBACK FindReplaceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM l
 /* Help dialog */
 void ShowHelpDialog(HWND hwnd);
 INT_PTR CALLBACK HelpDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+
+/* Go to Line dialog */
+void ShowGoToLineDialog(HWND hwnd);
+INT_PTR CALLBACK GoToLineDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
 
 /* Helper functions */
 void InitTabState(TabState* pState);

@@ -807,6 +807,66 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     ToggleVimMode(hwnd);
                     break;
                 
+                /* Zoom controls */
+                case IDM_VIEW_ZOOMIN:
+                    ZoomIn(hwnd);
+                    break;
+                case IDM_VIEW_ZOOMOUT:
+                    ZoomOut(hwnd);
+                    break;
+                case IDM_VIEW_ZOOMRESET:
+                    ZoomReset(hwnd);
+                    break;
+                
+                /* Tab navigation */
+                case IDM_TAB_NEXT:
+                    if (g_AppState.nTabCount > 1) {
+                        int nNext = (g_AppState.nCurrentTab + 1) % g_AppState.nTabCount;
+                        SwitchToTab(hwnd, nNext);
+                    }
+                    break;
+                case IDM_TAB_PREV:
+                    if (g_AppState.nTabCount > 1) {
+                        int nPrev = (g_AppState.nCurrentTab - 1 + g_AppState.nTabCount) % g_AppState.nTabCount;
+                        SwitchToTab(hwnd, nPrev);
+                    }
+                    break;
+                case IDM_TAB_1: case IDM_TAB_2: case IDM_TAB_3:
+                case IDM_TAB_4: case IDM_TAB_5: case IDM_TAB_6:
+                case IDM_TAB_7: case IDM_TAB_8: case IDM_TAB_9: {
+                    int nTab = LOWORD(wParam) - IDM_TAB_1;
+                    if (nTab < g_AppState.nTabCount) {
+                        SwitchToTab(hwnd, nTab);
+                    }
+                    break;
+                }
+                
+                /* Extended edit operations */
+                case IDM_EDIT_GOTOLINE:
+                    ShowGoToLineDialog(hwnd);
+                    break;
+                case IDM_EDIT_DUPLICATELINE:
+                    if (hwndEdit) EditDuplicateLine(hwndEdit);
+                    break;
+                case IDM_EDIT_DELETELINE:
+                    if (hwndEdit) EditDeleteLine(hwndEdit);
+                    break;
+                case IDM_EDIT_MOVELINEUP:
+                    if (hwndEdit) EditMoveLineUp(hwndEdit);
+                    break;
+                case IDM_EDIT_MOVELINEDOWN:
+                    if (hwndEdit) EditMoveLineDown(hwndEdit);
+                    break;
+                case IDM_EDIT_TOGGLECOMMENT:
+                    if (hwndEdit) EditToggleComment(hwndEdit);
+                    break;
+                case IDM_EDIT_INDENT:
+                    if (hwndEdit) EditIndent(hwndEdit);
+                    break;
+                case IDM_EDIT_UNINDENT:
+                    if (hwndEdit) EditUnindent(hwndEdit);
+                    break;
+                
                 /* Help menu */
                 case IDM_HELP_CONTENTS:
                     ShowHelpDialog(hwnd);

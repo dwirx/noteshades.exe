@@ -8,6 +8,17 @@
 #define IDM_FILE_EXIT       105
 #define IDM_FILE_NEWTAB     106
 #define IDM_FILE_CLOSETAB   107
+#define IDM_TAB_NEXT        108
+#define IDM_TAB_PREV        109
+#define IDM_TAB_1           110
+#define IDM_TAB_2           111
+#define IDM_TAB_3           112
+#define IDM_TAB_4           113
+#define IDM_TAB_5           114
+#define IDM_TAB_6           115
+#define IDM_TAB_7           116
+#define IDM_TAB_8           117
+#define IDM_TAB_9           118
 #define IDM_EDIT_UNDO       201
 #define IDM_EDIT_CUT        202
 #define IDM_EDIT_COPY       203
@@ -16,12 +27,23 @@
 #define IDM_EDIT_FIND       206
 #define IDM_EDIT_REPLACE    207
 #define IDM_EDIT_FINDNEXT   208
+#define IDM_EDIT_GOTOLINE       209
+#define IDM_EDIT_DUPLICATELINE  210
+#define IDM_EDIT_DELETELINE     211
+#define IDM_EDIT_MOVELINEUP     212
+#define IDM_EDIT_MOVELINEDOWN   213
+#define IDM_EDIT_TOGGLECOMMENT  214
+#define IDM_EDIT_INDENT         215
+#define IDM_EDIT_UNINDENT       216
 #define IDM_HELP_CONTENTS   302
 #define IDM_FORMAT_WORDWRAP 251
 #define IDM_VIEW_LINENUMBERS 261
 #define IDM_VIEW_SYNTAX      262
 #define IDM_VIEW_VIMMODE     263
 #define IDM_VIEW_RELATIVENUM 264
+#define IDM_VIEW_ZOOMIN     265
+#define IDM_VIEW_ZOOMOUT    266
+#define IDM_VIEW_ZOOMRESET  267
 #define IDM_HELP_ABOUT      301
 #define IDR_MAINMENU        1000
 #define IDR_ACCEL           1001
@@ -35,11 +57,13 @@ BEGIN
         MENUITEM "New &Tab\tCtrl+T",        IDM_FILE_NEWTAB
         MENUITEM "&Open...\tCtrl+O",        IDM_FILE_OPEN
         MENUITEM "&Save\tCtrl+S",           IDM_FILE_SAVE
-        MENUITEM "Save &As...",             IDM_FILE_SAVEAS
+        MENUITEM "Save &As...\tCtrl+Shift+S", IDM_FILE_SAVEAS
         MENUITEM SEPARATOR
         MENUITEM "&Close Tab\tCtrl+W",      IDM_FILE_CLOSETAB
+        MENUITEM "Next Tab\tCtrl+Tab",      IDM_TAB_NEXT
+        MENUITEM "Previous Tab\tCtrl+Shift+Tab", IDM_TAB_PREV
         MENUITEM SEPARATOR
-        MENUITEM "E&xit",                   IDM_FILE_EXIT
+        MENUITEM "E&xit\tAlt+F4",           IDM_FILE_EXIT
     END
     POPUP "&Edit"
     BEGIN
@@ -54,16 +78,30 @@ BEGIN
         MENUITEM "&Find...\tCtrl+F",        IDM_EDIT_FIND
         MENUITEM "Find &Next\tF3",          IDM_EDIT_FINDNEXT
         MENUITEM "&Replace...\tCtrl+H",     IDM_EDIT_REPLACE
+        MENUITEM "&Go to Line...\tCtrl+G",  IDM_EDIT_GOTOLINE
+        MENUITEM SEPARATOR
+        MENUITEM "&Duplicate Line\tCtrl+D", IDM_EDIT_DUPLICATELINE
+        MENUITEM "De&lete Line\tCtrl+Shift+K", IDM_EDIT_DELETELINE
+        MENUITEM "Move Line &Up\tAlt+Up",   IDM_EDIT_MOVELINEUP
+        MENUITEM "Move Line Do&wn\tAlt+Down", IDM_EDIT_MOVELINEDOWN
+        MENUITEM SEPARATOR
+        MENUITEM "&Indent\tTab",            IDM_EDIT_INDENT
+        MENUITEM "U&nindent\tShift+Tab",    IDM_EDIT_UNINDENT
+        MENUITEM "Toggle &Comment\tCtrl+/", IDM_EDIT_TOGGLECOMMENT
     END
     POPUP "F&ormat"
     BEGIN
-        MENUITEM "&Word Wrap",              IDM_FORMAT_WORDWRAP
+        MENUITEM "&Word Wrap\tAlt+Z",       IDM_FORMAT_WORDWRAP
     END
     POPUP "&View"
     BEGIN
-        MENUITEM "&Line Numbers",           IDM_VIEW_LINENUMBERS
+        MENUITEM "&Line Numbers\tCtrl+L",   IDM_VIEW_LINENUMBERS
         MENUITEM "&Relative Line Numbers",  IDM_VIEW_RELATIVENUM
         MENUITEM "&Syntax Highlighting",    IDM_VIEW_SYNTAX
+        MENUITEM SEPARATOR
+        MENUITEM "Zoom &In\tCtrl++",        IDM_VIEW_ZOOMIN
+        MENUITEM "Zoom &Out\tCtrl+-",       IDM_VIEW_ZOOMOUT
+        MENUITEM "Reset &Zoom\tCtrl+0",     IDM_VIEW_ZOOMRESET
         MENUITEM SEPARATOR
         MENUITEM "&Vim Mode\tCtrl+Shift+V", IDM_VIEW_VIMMODE
     END
@@ -78,11 +116,28 @@ END
 /* Accelerator Table for Keyboard Shortcuts */
 IDR_ACCEL ACCELERATORS
 BEGIN
+    /* File operations */
     "N",    IDM_FILE_NEW,       VIRTKEY, CONTROL
     "T",    IDM_FILE_NEWTAB,    VIRTKEY, CONTROL
     "O",    IDM_FILE_OPEN,      VIRTKEY, CONTROL
     "S",    IDM_FILE_SAVE,      VIRTKEY, CONTROL
+    "S",    IDM_FILE_SAVEAS,    VIRTKEY, CONTROL, SHIFT
     "W",    IDM_FILE_CLOSETAB,  VIRTKEY, CONTROL
+    
+    /* Tab navigation */
+    VK_TAB, IDM_TAB_NEXT,       VIRTKEY, CONTROL
+    VK_TAB, IDM_TAB_PREV,       VIRTKEY, CONTROL, SHIFT
+    "1",    IDM_TAB_1,          VIRTKEY, CONTROL
+    "2",    IDM_TAB_2,          VIRTKEY, CONTROL
+    "3",    IDM_TAB_3,          VIRTKEY, CONTROL
+    "4",    IDM_TAB_4,          VIRTKEY, CONTROL
+    "5",    IDM_TAB_5,          VIRTKEY, CONTROL
+    "6",    IDM_TAB_6,          VIRTKEY, CONTROL
+    "7",    IDM_TAB_7,          VIRTKEY, CONTROL
+    "8",    IDM_TAB_8,          VIRTKEY, CONTROL
+    "9",    IDM_TAB_9,          VIRTKEY, CONTROL
+    
+    /* Edit operations */
     "Z",    IDM_EDIT_UNDO,      VIRTKEY, CONTROL
     "X",    IDM_EDIT_CUT,       VIRTKEY, CONTROL
     "C",    IDM_EDIT_COPY,      VIRTKEY, CONTROL
@@ -90,7 +145,27 @@ BEGIN
     "A",    IDM_EDIT_SELECTALL, VIRTKEY, CONTROL
     "F",    IDM_EDIT_FIND,      VIRTKEY, CONTROL
     "H",    IDM_EDIT_REPLACE,   VIRTKEY, CONTROL
+    "G",    IDM_EDIT_GOTOLINE,  VIRTKEY, CONTROL
     VK_F3,  IDM_EDIT_FINDNEXT,  VIRTKEY
+    
+    /* Line operations */
+    "D",    IDM_EDIT_DUPLICATELINE, VIRTKEY, CONTROL
+    "K",    IDM_EDIT_DELETELINE,    VIRTKEY, CONTROL, SHIFT
+    VK_UP,  IDM_EDIT_MOVELINEUP,    VIRTKEY, ALT
+    VK_DOWN, IDM_EDIT_MOVELINEDOWN, VIRTKEY, ALT
+    VK_OEM_2, IDM_EDIT_TOGGLECOMMENT, VIRTKEY, CONTROL  /* Ctrl+/ */
+    
+    /* View operations */
+    "L",    IDM_VIEW_LINENUMBERS, VIRTKEY, CONTROL
+    "V",    IDM_VIEW_VIMMODE,   VIRTKEY, CONTROL, SHIFT
+    VK_OEM_PLUS, IDM_VIEW_ZOOMIN, VIRTKEY, CONTROL
+    VK_OEM_MINUS, IDM_VIEW_ZOOMOUT, VIRTKEY, CONTROL
+    "0",    IDM_VIEW_ZOOMRESET, VIRTKEY, CONTROL
+    
+    /* Format */
+    "Z",    IDM_FORMAT_WORDWRAP, VIRTKEY, ALT
+    
+    /* Help */
     VK_F1,  IDM_HELP_CONTENTS,  VIRTKEY
 END
 
@@ -103,6 +178,11 @@ END
 #define IDC_REPLACE_ALL     505
 #define IDC_MATCH_CASE      506
 #define IDC_WHOLE_WORD      507
+
+/* Go to Line Dialog IDs */
+#define IDD_GOTOLINE        550
+#define IDC_GOTOLINE_EDIT   551
+#define IDC_GOTOLINE_INFO   552
 
 /* Help Dialog ID */
 #define IDD_HELP            600
@@ -126,8 +206,21 @@ BEGIN
     PUSHBUTTON      "Close",IDCANCEL,215,95,55,14
 END
 
+/* Go to Line Dialog */
+IDD_GOTOLINE DIALOGEX 0, 0, 200, 70
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Go to Line"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT           "Line number:",1200,10,12,50,10
+    EDITTEXT        IDC_GOTOLINE_EDIT,65,10,70,14,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "",IDC_GOTOLINE_INFO,10,30,180,10
+    DEFPUSHBUTTON   "Go",IDOK,85,50,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,140,50,50,14
+END
+
 /* Help Dialog */
-IDD_HELP DIALOGEX 0, 0, 350, 320
+IDD_HELP DIALOGEX 0, 0, 420, 380
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "XNote Help - Keyboard Shortcuts"
 FONT 9, "Segoe UI"
@@ -136,53 +229,100 @@ BEGIN
     LTEXT           "Version 1.0",1101,10,22,100,10
     
     LTEXT           "FILE OPERATIONS",1102,10,42,100,10
-    LTEXT           "Ctrl+N",1103,20,56,40,10
-    LTEXT           "New document",1104,70,56,100,10
-    LTEXT           "Ctrl+T",1105,20,68,40,10
-    LTEXT           "New tab",1106,70,68,100,10
-    LTEXT           "Ctrl+O",1107,20,80,40,10
-    LTEXT           "Open file",1108,70,80,100,10
-    LTEXT           "Ctrl+S",1109,20,92,40,10
-    LTEXT           "Save file",1110,70,92,100,10
-    LTEXT           "Ctrl+W",1111,20,104,40,10
-    LTEXT           "Close tab",1112,70,104,100,10
+    LTEXT           "Ctrl+N",1103,20,56,50,10
+    LTEXT           "New document",1104,75,56,80,10
+    LTEXT           "Ctrl+T",1105,20,68,50,10
+    LTEXT           "New tab",1106,75,68,80,10
+    LTEXT           "Ctrl+O",1107,20,80,50,10
+    LTEXT           "Open file",1108,75,80,80,10
+    LTEXT           "Ctrl+S",1109,20,92,50,10
+    LTEXT           "Save file",1110,75,92,80,10
+    LTEXT           "Ctrl+Shift+S",1111,20,104,50,10
+    LTEXT           "Save As",1112,75,104,80,10
+    LTEXT           "Ctrl+W",1113,20,116,50,10
+    LTEXT           "Close tab",1114,75,116,80,10
     
-    LTEXT           "EDIT OPERATIONS",1113,10,124,100,10
-    LTEXT           "Ctrl+Z",1114,20,138,40,10
-    LTEXT           "Undo",1115,70,138,100,10
-    LTEXT           "Ctrl+X",1116,20,150,40,10
-    LTEXT           "Cut",1117,70,150,100,10
-    LTEXT           "Ctrl+C",1118,20,162,40,10
-    LTEXT           "Copy",1119,70,162,100,10
-    LTEXT           "Ctrl+V",1120,20,174,40,10
-    LTEXT           "Paste",1121,70,174,100,10
-    LTEXT           "Ctrl+A",1122,20,186,40,10
-    LTEXT           "Select all",1123,70,186,100,10
+    LTEXT           "TAB NAVIGATION",1115,10,136,100,10
+    LTEXT           "Ctrl+Tab",1116,20,150,50,10
+    LTEXT           "Next tab",1117,75,150,80,10
+    LTEXT           "Ctrl+Shift+Tab",1118,20,162,55,10
+    LTEXT           "Previous tab",1119,75,162,80,10
+    LTEXT           "Ctrl+1-9",1120,20,174,50,10
+    LTEXT           "Go to tab 1-9",1121,75,174,80,10
     
-    LTEXT           "FIND & REPLACE",1124,180,42,100,10
-    LTEXT           "Ctrl+F",1125,190,56,40,10
-    LTEXT           "Find",1126,240,56,100,10
-    LTEXT           "Ctrl+H",1127,190,68,40,10
-    LTEXT           "Find and Replace",1128,240,68,100,10
-    LTEXT           "F3",1129,190,80,40,10
-    LTEXT           "Find next",1130,240,80,100,10
+    LTEXT           "EDIT OPERATIONS",1122,170,42,100,10
+    LTEXT           "Ctrl+Z",1123,180,56,50,10
+    LTEXT           "Undo",1124,235,56,80,10
+    LTEXT           "Ctrl+X",1125,180,68,50,10
+    LTEXT           "Cut",1126,235,68,80,10
+    LTEXT           "Ctrl+C",1127,180,80,50,10
+    LTEXT           "Copy",1128,235,80,80,10
+    LTEXT           "Ctrl+V",1129,180,92,50,10
+    LTEXT           "Paste",1130,235,92,80,10
+    LTEXT           "Ctrl+A",1131,180,104,50,10
+    LTEXT           "Select all",1132,235,104,80,10
+    LTEXT           "Ctrl+D",1133,180,116,50,10
+    LTEXT           "Duplicate line",1134,235,116,80,10
+    LTEXT           "Ctrl+Shift+K",1135,180,128,50,10
+    LTEXT           "Delete line",1136,235,128,80,10
+    LTEXT           "Alt+Up/Down",1137,180,140,50,10
+    LTEXT           "Move line",1138,235,140,80,10
+    LTEXT           "Ctrl+/",1139,180,152,50,10
+    LTEXT           "Toggle comment",1140,235,152,80,10
     
-    LTEXT           "VIEW OPTIONS",1131,180,100,100,10
-    LTEXT           "View > Line Numbers",1132,190,114,150,10
-    LTEXT           "Toggle line numbers",1133,190,126,150,10
-    LTEXT           "View > Syntax Highlighting",1134,190,142,150,10
-    LTEXT           "Toggle syntax colors",1135,190,154,150,10
-    LTEXT           "View > Vim Mode",1136,190,170,150,10
-    LTEXT           "Toggle vim navigation",1137,190,182,150,10
+    LTEXT           "FIND & NAVIGATION",1141,170,172,100,10
+    LTEXT           "Ctrl+F",1142,180,186,50,10
+    LTEXT           "Find",1143,235,186,80,10
+    LTEXT           "Ctrl+H",1144,180,198,50,10
+    LTEXT           "Find and Replace",1145,235,198,80,10
+    LTEXT           "F3",1146,180,210,50,10
+    LTEXT           "Find next",1147,235,210,80,10
+    LTEXT           "Ctrl+G",1148,180,222,50,10
+    LTEXT           "Go to line",1149,235,222,80,10
     
-    LTEXT           "SUPPORTED FILE TYPES",1138,10,206,150,10
-    LTEXT           "C, C++, Java, JavaScript, TypeScript, Python, Go, Rust,",1139,20,220,320,10
-    LTEXT           "HTML, CSS, JSON, XML, YAML, SQL, PHP, Ruby, Shell,",1140,20,232,320,10
-    LTEXT           "Batch, PowerShell, Markdown, and more...",1141,20,244,320,10
+    LTEXT           "VIEW OPTIONS",1150,330,42,80,10
+    LTEXT           "Ctrl+L",1151,340,56,40,10
+    LTEXT           "Line numbers",1152,385,56,70,10
+    LTEXT           "Ctrl++",1153,340,68,40,10
+    LTEXT           "Zoom in",1154,385,68,70,10
+    LTEXT           "Ctrl+-",1155,340,80,40,10
+    LTEXT           "Zoom out",1156,385,80,70,10
+    LTEXT           "Ctrl+0",1157,340,92,40,10
+    LTEXT           "Reset zoom",1158,385,92,70,10
+    LTEXT           "Alt+Z",1159,340,104,40,10
+    LTEXT           "Word wrap",1160,385,104,70,10
+    LTEXT           "Ctrl+Shift+V",1161,340,116,50,10
+    LTEXT           "Vim mode",1162,385,116,70,10
     
-    LTEXT           "VIM MODE KEYS",1142,10,264,100,10
-    LTEXT           "h/j/k/l - Move left/down/up/right",1143,20,278,200,10
-    LTEXT           "i - Insert mode, Esc - Normal mode",1144,20,290,250,10
+    LTEXT           "VIM MODE KEYS",1163,330,136,80,10
+    LTEXT           "h/j/k/l",1164,340,150,40,10
+    LTEXT           "Move cursor",1165,385,150,70,10
+    LTEXT           "w/b/e",1166,340,162,40,10
+    LTEXT           "Word motion",1167,385,162,70,10
+    LTEXT           "0/$",1168,340,174,40,10
+    LTEXT           "Line start/end",1169,385,174,70,10
+    LTEXT           "gg/G",1170,340,186,40,10
+    LTEXT           "First/last line",1171,385,186,70,10
+    LTEXT           "i/a/o",1172,340,198,40,10
+    LTEXT           "Insert mode",1173,385,198,70,10
+    LTEXT           "v/V",1174,340,210,40,10
+    LTEXT           "Visual mode",1175,385,210,70,10
+    LTEXT           "d/y/p",1176,340,222,40,10
+    LTEXT           "Delete/yank/paste",1177,385,222,70,10
+    LTEXT           "Esc",1178,340,234,40,10
+    LTEXT           "Normal mode",1179,385,234,70,10
     
-    PUSHBUTTON      "OK",IDOK,145,300,60,14
+    LTEXT           "SUPPORTED FILE TYPES",1180,10,200,150,10
+    LTEXT           "C, C++, Java, JavaScript, TypeScript, Python, Go, Rust,",1181,20,214,300,10
+    LTEXT           "HTML, CSS, JSON, XML, YAML, SQL, PHP, Ruby, Shell,",1182,20,226,300,10
+    LTEXT           "Batch, PowerShell, Markdown, and more...",1183,20,238,300,10
+    
+    LTEXT           "TIPS",1184,10,258,100,10
+    LTEXT           "- Use Vim mode for efficient keyboard-only editing",1185,20,272,300,10
+    LTEXT           "- Ctrl+Tab cycles through open tabs quickly",1186,20,284,300,10
+    LTEXT           "- Alt+Up/Down moves entire lines without cut/paste",1187,20,296,300,10
+    LTEXT           "- Ctrl+D duplicates current line instantly",1188,20,308,300,10
+    LTEXT           "- Ctrl+G jumps to any line number",1189,20,320,300,10
+    
+    PUSHBUTTON      "OK",IDOK,180,355,60,14
 END
