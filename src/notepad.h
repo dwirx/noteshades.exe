@@ -118,6 +118,7 @@ void ShowReplaceDialog(HWND hwnd);
 void FindNext(HWND hwnd);
 void ReplaceCurrent(HWND hwnd);
 void ReplaceAll(HWND hwnd);
+HWND GetFindReplaceDialog(void);
 INT_PTR CALLBACK FindReplaceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
 
 /* Help dialog */

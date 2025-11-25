@@ -165,6 +165,40 @@ static int ReplaceAllText(HWND hwndEdit, const TCHAR* szFind, const TCHAR* szRep
     return nCount;
 }
 
+/* Subclass procedure for edit controls in Find dialog to handle Ctrl+A */
+static WNDPROC g_OrigFindEditProc = NULL;
+
+static LRESULT CALLBACK FindEditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+        case WM_KEYDOWN:
+            /* Handle Ctrl+A to select all in this edit box only */
+            if (wParam == 'A' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+                SendMessage(hwnd, EM_SETSEL, 0, -1);
+                return 0;
+            }
+            /* Handle Enter key to trigger Find Next */
+            if (wParam == VK_RETURN) {
+                HWND hDlg = GetParent(hwnd);
+                SendMessage(hDlg, WM_COMMAND, MAKEWPARAM(IDC_FIND_NEXT, BN_CLICKED), 0);
+                return 0;
+            }
+            /* Handle Escape to close dialog */
+            if (wParam == VK_ESCAPE) {
+                HWND hDlg = GetParent(hwnd);
+                SendMessage(hDlg, WM_COMMAND, MAKEWPARAM(IDCANCEL, BN_CLICKED), 0);
+                return 0;
+            }
+            break;
+        case WM_CHAR:
+            /* Prevent beep on Enter */
+            if (wParam == VK_RETURN || wParam == VK_ESCAPE) {
+                return 0;
+            }
+            break;
+    }
+    return CallWindowProc(g_OrigFindEditProc, hwnd, msg, wParam, lParam);
+}
+
 INT_PTR CALLBACK FindReplaceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
     (void)lParam;
     switch (msg) {
@@ -173,25 +207,55 @@ INT_PTR CALLBACK FindReplaceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM l
             SetDlgItemText(hDlg, IDC_REPLACE_TEXT, g_szReplaceText);
             CheckDlgButton(hDlg, IDC_MATCH_CASE, g_bMatchCase ? BST_CHECKED : BST_UNCHECKED);
             CheckDlgButton(hDlg, IDC_WHOLE_WORD, g_bWholeWord ? BST_CHECKED : BST_UNCHECKED);
+            
+            /* Center dialog */
             RECT rcOwner, rcDlg;
             GetWindowRect(GetParent(hDlg), &rcOwner);
             GetWindowRect(hDlg, &rcDlg);
             SetWindowPos(hDlg, NULL, rcOwner.left + (rcOwner.right - rcOwner.left - (rcDlg.right - rcDlg.left)) / 2,
                          rcOwner.top + (rcOwner.bottom - rcOwner.top - (rcDlg.bottom - rcDlg.top)) / 2, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-            SetFocus(GetDlgItem(hDlg, IDC_FIND_TEXT));
+            
+            /* Subclass edit controls to handle Ctrl+A and Enter */
+            HWND hwndFindEdit = GetDlgItem(hDlg, IDC_FIND_TEXT);
+            HWND hwndReplaceEdit = GetDlgItem(hDlg, IDC_REPLACE_TEXT);
+            if (hwndFindEdit) {
+                g_OrigFindEditProc = (WNDPROC)SetWindowLongPtr(hwndFindEdit, GWLP_WNDPROC, (LONG_PTR)FindEditSubclassProc);
+            }
+            if (hwndReplaceEdit) {
+                SetWindowLongPtr(hwndReplaceEdit, GWLP_WNDPROC, (LONG_PTR)FindEditSubclassProc);
+            }
+            
+            /* Select all text in find box */
+            SendMessage(hwndFindEdit, EM_SETSEL, 0, -1);
+            SetFocus(hwndFindEdit);
             return FALSE;
         }
         case WM_COMMAND:
             switch (LOWORD(wParam)) {
-                case IDC_FIND_NEXT:
-                case IDOK: {
+                case IDOK:  /* Enter key triggers IDOK via IsDialogMessage */
+                case IDC_FIND_NEXT: {
                     GetDlgItemText(hDlg, IDC_FIND_TEXT, g_szFindText, 256);
                     g_bMatchCase = IsDlgButtonChecked(hDlg, IDC_MATCH_CASE) == BST_CHECKED;
                     g_bWholeWord = IsDlgButtonChecked(hDlg, IDC_WHOLE_WORD) == BST_CHECKED;
+                    
+                    HWND hwndFindEdit = GetDlgItem(hDlg, IDC_FIND_TEXT);
+                    
+                    if (g_szFindText[0] == TEXT('\0')) {
+                        SetFocus(hwndFindEdit);
+                        return TRUE;
+                    }
+                    
                     HWND hwndEdit = GetCurrentEdit();
                     if (!FindTextInEdit(hwndEdit, g_szFindText, g_bMatchCase, g_bWholeWord, FALSE)) {
                         if (!FindTextInEdit(hwndEdit, g_szFindText, g_bMatchCase, g_bWholeWord, TRUE)) {
                             MessageBox(hDlg, TEXT("Text not found."), TEXT("Find"), MB_OK | MB_ICONINFORMATION);
+                            /* Return focus to search field and select all text */
+                            SetFocus(hwndFindEdit);
+                            SendMessage(hwndFindEdit, EM_SETSEL, 0, -1);
+                        } else {
+                            /* Found from beginning - keep focus on search for quick re-search */
+                            SetFocus(hwndFindEdit);
+                            SendMessage(hwndFindEdit, EM_SETSEL, 0, -1);
                         }
                     }
                     return TRUE;
@@ -238,6 +302,10 @@ INT_PTR CALLBACK FindReplaceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM l
                     if (!FindTextInEdit(hwndEdit, g_szFindText, g_bMatchCase, g_bWholeWord, FALSE)) {
                         if (!FindTextInEdit(hwndEdit, g_szFindText, g_bMatchCase, g_bWholeWord, TRUE)) {
                             MessageBox(hDlg, TEXT("No more occurrences found."), TEXT("Replace"), MB_OK | MB_ICONINFORMATION);
+                            /* Return focus to search field and select all */
+                            HWND hwndFindEdit = GetDlgItem(hDlg, IDC_FIND_TEXT);
+                            SetFocus(hwndFindEdit);
+                            SendMessage(hwndFindEdit, EM_SETSEL, 0, -1);
                         }
                     }
                     return TRUE;
@@ -300,6 +368,10 @@ void FindNext(HWND hwnd) {
             MessageBox(g_AppState.hwndMain, TEXT("Text not found."), TEXT("Find"), MB_OK | MB_ICONINFORMATION);
         }
     }
+}
+
+HWND GetFindReplaceDialog(void) {
+    return g_hwndFindReplace;
 }
 
 INT_PTR CALLBACK HelpDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {

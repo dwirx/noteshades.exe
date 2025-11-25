@@ -978,8 +978,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     /* Load accelerator table */
     g_AppState.hAccel = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDR_ACCEL));
     
-    /* Message loop with accelerator handling */
+    /* Message loop with accelerator and dialog handling */
     while (GetMessage(&msg, NULL, 0, 0)) {
+        HWND hwndFindDlg = GetFindReplaceDialog();
+        
+        /* Check if Find/Replace dialog is open and message is for it */
+        if (hwndFindDlg && IsDialogMessage(hwndFindDlg, &msg)) {
+            /* Dialog handled the message - skip accelerator and normal processing */
+            continue;
+        }
+        
+        /* Process accelerators for main window */
         if (!TranslateAccelerator(g_AppState.hwndMain, g_AppState.hAccel, &msg)) {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
