@@ -13,6 +13,7 @@
 #define IDM_EDIT_SELECTALL  205
 #define IDM_FORMAT_WORDWRAP 251
 #define IDM_VIEW_LINENUMBERS 261
+#define IDM_VIEW_SYNTAX      262
 #define IDM_HELP_ABOUT      301
 #define IDR_MAINMENU        1000
 #define IDR_ACCEL           1001
@@ -49,6 +50,7 @@ BEGIN
     POPUP "&View"
     BEGIN
         MENUITEM "&Line Numbers",           IDM_VIEW_LINENUMBERS
+        MENUITEM "&Syntax Highlighting",    IDM_VIEW_SYNTAX
     END
     POPUP "&Help"
     BEGIN

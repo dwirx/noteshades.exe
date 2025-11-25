@@ -7,6 +7,32 @@
 #include <commdlg.h>
 #include "resource.h"
 
+/* Forward declare LanguageType from syntax.h */
+typedef enum {
+    LANG_NONE = 0,
+    LANG_C,
+    LANG_CPP,
+    LANG_JAVA,
+    LANG_JAVASCRIPT,
+    LANG_TYPESCRIPT,
+    LANG_PYTHON,
+    LANG_GO,
+    LANG_RUST,
+    LANG_HTML,
+    LANG_CSS,
+    LANG_JSON,
+    LANG_XML,
+    LANG_YAML,
+    LANG_SQL,
+    LANG_PHP,
+    LANG_RUBY,
+    LANG_SHELL,
+    LANG_BATCH,
+    LANG_POWERSHELL,
+    LANG_MARKDOWN,
+    LANG_COUNT
+} LanguageType;
+
 /* Application name */
 #define APP_NAME TEXT("XNote")
 #define APP_VERSION TEXT("1.0")
@@ -39,6 +65,7 @@ typedef struct {
     LineNumberState lineNumState; /* Line number state for this tab */
     LineEndingType lineEnding;   /* Line ending type */
     BOOL bInsertMode;            /* Insert/Overwrite mode */
+    LanguageType language;       /* Language for syntax highlighting */
 } TabState;
 
 /* Application state structure */

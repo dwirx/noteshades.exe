@@ -1,4 +1,5 @@
 #include "notepad.h"
+#include "syntax.h"
 #include <richedit.h>
 
 /* Global application state */
@@ -202,6 +203,7 @@ void InitTabState(TabState* pState) {
     pState->lineNumState.nLineNumberWidth = 0;
     pState->lineEnding = LINE_ENDING_CRLF;  /* Default Windows line ending */
     pState->bInsertMode = TRUE;              /* Default insert mode */
+    pState->language = LANG_NONE;            /* No syntax highlighting by default */
 }
 
 /* Create edit control for a tab */
@@ -526,6 +528,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                           g_AppState.bShowLineNumbers ? MF_CHECKED : MF_UNCHECKED);
             CheckMenuItem(hMenu, IDM_FORMAT_WORDWRAP, 
                           g_AppState.bWordWrap ? MF_CHECKED : MF_UNCHECKED);
+            CheckMenuItem(hMenu, IDM_VIEW_SYNTAX, 
+                          g_bSyntaxHighlight ? MF_CHECKED : MF_UNCHECKED);
             
             /* Start periodic sync timer for line numbers if enabled */
             if (g_AppState.bShowLineNumbers) {
@@ -746,6 +750,25 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 case IDM_VIEW_LINENUMBERS:
                     ToggleLineNumbers(hwnd);
                     break;
+                
+                case IDM_VIEW_SYNTAX: {
+                    /* Toggle syntax highlighting */
+                    g_bSyntaxHighlight = !g_bSyntaxHighlight;
+                    HMENU hMenu = GetMenu(hwnd);
+                    CheckMenuItem(hMenu, IDM_VIEW_SYNTAX, 
+                                  g_bSyntaxHighlight ? MF_CHECKED : MF_UNCHECKED);
+                    /* Re-apply highlighting */
+                    if (pTab && pTab->hwndEdit) {
+                        if (g_bSyntaxHighlight) {
+                            pTab->language = DetectLanguage(pTab->szFileName);
+                            ApplySyntaxHighlighting(pTab->hwndEdit, pTab->language);
+                        } else {
+                            /* Reset to default color */
+                            SetupSyntaxHighlighting(pTab->hwndEdit, LANG_NONE);
+                        }
+                    }
+                    break;
+                }
                 
                 /* Help menu */
                 case IDM_HELP_ABOUT:

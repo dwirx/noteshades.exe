@@ -23,10 +23,11 @@ SRCS = $(SRC_DIR)/main.c \
        $(SRC_DIR)/edit_ops.c \
        $(SRC_DIR)/dialogs.c \
        $(SRC_DIR)/line_numbers.c \
-       $(SRC_DIR)/statusbar.c
+       $(SRC_DIR)/statusbar.c \
+       $(SRC_DIR)/syntax.c
 
 # Object files
-OBJS = $(SRC_DIR)/main.o $(SRC_DIR)/file_ops.o $(SRC_DIR)/edit_ops.o $(SRC_DIR)/dialogs.o $(SRC_DIR)/line_numbers.o $(SRC_DIR)/statusbar.o
+OBJS = $(SRC_DIR)/main.o $(SRC_DIR)/file_ops.o $(SRC_DIR)/edit_ops.o $(SRC_DIR)/dialogs.o $(SRC_DIR)/line_numbers.o $(SRC_DIR)/statusbar.o $(SRC_DIR)/syntax.o
 
 # Resource files
 RES_SRC = $(SRC_DIR)/notepad.rc
@@ -58,6 +59,9 @@ $(SRC_DIR)/line_numbers.o: $(SRC_DIR)/line_numbers.c $(SRC_DIR)/notepad.h $(SRC_
 
 $(SRC_DIR)/statusbar.o: $(SRC_DIR)/statusbar.c $(SRC_DIR)/notepad.h $(SRC_DIR)/resource.h
 	$(CC) $(CFLAGS) -c $(SRC_DIR)/statusbar.c -o $(SRC_DIR)/statusbar.o
+
+$(SRC_DIR)/syntax.o: $(SRC_DIR)/syntax.c $(SRC_DIR)/notepad.h $(SRC_DIR)/syntax.h $(SRC_DIR)/resource.h
+	$(CC) $(CFLAGS) -c $(SRC_DIR)/syntax.c -o $(SRC_DIR)/syntax.o
 
 # Compile resource file
 $(RES_OBJ): $(RES_SRC) $(SRC_DIR)/resource.h

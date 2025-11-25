@@ -20,6 +20,7 @@
 
 /* View menu command IDs */
 #define IDM_VIEW_LINENUMBERS 261
+#define IDM_VIEW_SYNTAX      262
 
 /* Help menu command IDs */
 #define IDM_HELP_ABOUT      301

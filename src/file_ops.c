@@ -1,4 +1,5 @@
 #include "notepad.h"
+#include "syntax.h"
 #include <stdio.h>
 
 /* Update window title based on current tab */
@@ -282,6 +283,12 @@ BOOL FileOpen(HWND hwnd) {
     _tcscpy(pTab->szFileName, szFileName);
     pTab->bModified = FALSE;
     pTab->bUntitled = FALSE;
+    
+    /* Detect language and apply syntax highlighting */
+    pTab->language = DetectLanguage(szFileName);
+    if (g_bSyntaxHighlight && pTab->language != LANG_NONE) {
+        ApplySyntaxHighlighting(hwndEdit, pTab->language);
+    }
     
     /* Update titles */
     UpdateTabTitle(g_AppState.nCurrentTab);

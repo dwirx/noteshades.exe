@@ -1,4 +1,5 @@
 #include "notepad.h"
+#include "syntax.h"
 
 /* Create status bar */
 HWND CreateStatusBar(HWND hwndParent, HINSTANCE hInstance) {
@@ -143,12 +144,18 @@ void UpdateStatusBar(HWND hwnd) {
     
     TCHAR szText[256];
     
-    /* Part 0: File type */
+    /* Part 0: File type / Language */
     if (pTab) {
-        const TCHAR* szFileType = GetFileTypeString(pTab->szFileName);
-        SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_FILETYPE, (LPARAM)szFileType);
+        if (pTab->language != LANG_NONE && g_bSyntaxHighlight) {
+            /* Show detected language */
+            const TCHAR* szLang = GetLanguageName(pTab->language);
+            SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_FILETYPE, (LPARAM)szLang);
+        } else {
+            const TCHAR* szFileType = GetFileTypeString(pTab->szFileName);
+            SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_FILETYPE, (LPARAM)szFileType);
+        }
     } else {
-        SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_FILETYPE, (LPARAM)TEXT("Normal text file"));
+        SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_FILETYPE, (LPARAM)TEXT("Plain Text"));
     }
     
     if (hwndEdit) {
