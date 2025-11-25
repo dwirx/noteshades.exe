@@ -1,5 +1,6 @@
 #include "notepad.h"
 #include "syntax.h"
+#include "vim_mode.h"
 
 /* Create status bar */
 HWND CreateStatusBar(HWND hwndParent, HINSTANCE hInstance) {
@@ -33,6 +34,9 @@ void SetStatusBarParts(HWND hwndStatus, int nWidth) {
     int nRight = nWidth;
     
     /* Calculate part positions from right to left */
+    nParts[SB_PART_VIMMODE] = nRight;
+    nRight -= 70; /* Width for vim mode */
+    
     nParts[SB_PART_INSERTMODE] = nRight;
     nRight -= SB_WIDTH_INSERTMODE;
     
@@ -220,5 +224,12 @@ void UpdateStatusBar(HWND hwnd) {
                     (LPARAM)(pTab->bInsertMode ? TEXT("INS") : TEXT("OVR")));
     } else {
         SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_INSERTMODE, (LPARAM)TEXT("INS"));
+    }
+    
+    /* Part 7: Vim mode */
+    if (IsVimModeEnabled()) {
+        SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_VIMMODE, (LPARAM)GetVimModeString());
+    } else {
+        SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_VIMMODE, (LPARAM)TEXT(""));
     }
 }

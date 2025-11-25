@@ -27,6 +27,7 @@
 /* View menu command IDs */
 #define IDM_VIEW_LINENUMBERS 261
 #define IDM_VIEW_SYNTAX      262
+#define IDM_VIEW_VIMMODE     263
 
 /* Help menu command IDs */
 #define IDM_HELP_ABOUT      301
@@ -55,7 +56,8 @@
 #define SB_PART_LINEENDING  4
 #define SB_PART_ENCODING    5
 #define SB_PART_INSERTMODE  6
-#define SB_PART_COUNT       7
+#define SB_PART_VIMMODE     7
+#define SB_PART_COUNT       8
 
 /* Status bar widths */
 #define SB_WIDTH_FILETYPE   120

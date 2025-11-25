@@ -160,4 +160,7 @@ void SetStatusBarParts(HWND hwndStatus, int nWidth);
 const TCHAR* GetFileTypeString(const TCHAR* szFileName);
 int CountWords(HWND hwndEdit);
 
+/* Vim mode operations */
+#include "vim_mode.h"
+
 #endif /* NOTEPAD_H */

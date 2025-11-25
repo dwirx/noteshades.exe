@@ -1,5 +1,6 @@
 #include "notepad.h"
 #include "syntax.h"
+#include "vim_mode.h"
 #include <richedit.h>
 
 /* Global application state */
@@ -17,8 +18,22 @@ static HMODULE g_hRichEdit = NULL;
 /* Original edit control window procedure */
 static WNDPROC g_OrigEditProc = NULL;
 
-/* Subclassed edit control procedure to catch scroll events */
+/* Subclassed edit control procedure to catch scroll events and vim keys */
 static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    /* Process vim keys first if vim mode is enabled */
+    if (IsVimModeEnabled()) {
+        if (msg == WM_KEYDOWN || msg == WM_CHAR) {
+            if (ProcessVimKey(hwnd, msg, wParam, lParam)) {
+                /* Sync line numbers after vim navigation */
+                TabState* pTab = GetCurrentTabState();
+                if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                    SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+                }
+                return 0; /* Key was handled by vim */
+            }
+        }
+    }
+    
     switch (msg) {
         case WM_VSCROLL:
         case WM_HSCROLL:
@@ -780,6 +795,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     }
                     break;
                 }
+                
+                case IDM_VIEW_VIMMODE:
+                    ToggleVimMode(hwnd);
+                    break;
                 
                 /* Help menu */
                 case IDM_HELP_CONTENTS:

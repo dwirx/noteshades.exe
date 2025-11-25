@@ -1,0 +1,93 @@
+#ifndef VIM_MODE_H
+#define VIM_MODE_H
+
+#include <windows.h>
+#include <tchar.h>
+
+/* Vim mode states */
+typedef enum {
+    VIM_MODE_NORMAL = 0,    /* Normal mode - navigation */
+    VIM_MODE_INSERT,        /* Insert mode - typing */
+    VIM_MODE_VISUAL,        /* Visual mode - selection */
+    VIM_MODE_COMMAND        /* Command mode - : commands */
+} VimModeState;
+
+/* Vim state structure */
+typedef struct {
+    BOOL bEnabled;              /* Vim mode enabled/disabled */
+    VimModeState mode;          /* Current vim mode */
+    int nRepeatCount;           /* Repeat count for commands (e.g., 5j) */
+    TCHAR chPendingOp;          /* Pending operator (d, y, c) */
+    DWORD dwVisualStart;        /* Visual mode selection start */
+    TCHAR szCommandBuffer[64];  /* Command buffer for : commands */
+    int nCommandLen;            /* Command buffer length */
+    TCHAR szSearchPattern[256]; /* Last search pattern */
+    BOOL bSearchForward;        /* Search direction */
+} VimState;
+
+/* Global vim state */
+extern VimState g_VimState;
+
+/* Initialize vim mode */
+void InitVimMode(void);
+
+/* Toggle vim mode on/off */
+void ToggleVimMode(HWND hwnd);
+
+/* Check if vim mode is enabled */
+BOOL IsVimModeEnabled(void);
+
+/* Get current vim mode state */
+VimModeState GetVimModeState(void);
+
+/* Get vim mode string for status bar */
+const TCHAR* GetVimModeString(void);
+
+/* Process key input in vim mode
+ * Returns TRUE if key was handled, FALSE to pass to default handler */
+BOOL ProcessVimKey(HWND hwndEdit, UINT msg, WPARAM wParam, LPARAM lParam);
+
+/* Vim navigation commands */
+void VimMoveLeft(HWND hwndEdit, int count);
+void VimMoveRight(HWND hwndEdit, int count);
+void VimMoveUp(HWND hwndEdit, int count);
+void VimMoveDown(HWND hwndEdit, int count);
+void VimMoveWordForward(HWND hwndEdit, int count);
+void VimMoveWordBackward(HWND hwndEdit, int count);
+void VimMoveLineStart(HWND hwndEdit);
+void VimMoveLineEnd(HWND hwndEdit);
+void VimMoveFirstLine(HWND hwndEdit);
+void VimMoveLastLine(HWND hwndEdit);
+void VimMoveToLine(HWND hwndEdit, int line);
+void VimPageDown(HWND hwndEdit, int count);
+void VimPageUp(HWND hwndEdit, int count);
+void VimHalfPageDown(HWND hwndEdit, int count);
+void VimHalfPageUp(HWND hwndEdit, int count);
+
+/* Vim edit commands */
+void VimDeleteChar(HWND hwndEdit, int count);
+void VimDeleteCharBefore(HWND hwndEdit, int count);
+void VimDeleteLine(HWND hwndEdit, int count);
+void VimDeleteToEnd(HWND hwndEdit);
+void VimYankLine(HWND hwndEdit, int count);
+void VimPaste(HWND hwndEdit);
+void VimPasteBefore(HWND hwndEdit);
+void VimUndo(HWND hwndEdit);
+
+/* Vim mode transitions */
+void VimEnterInsertMode(HWND hwndEdit);
+void VimEnterInsertModeAfter(HWND hwndEdit);
+void VimEnterInsertModeLineStart(HWND hwndEdit);
+void VimEnterInsertModeLineEnd(HWND hwndEdit);
+void VimEnterInsertModeNewLineBelow(HWND hwndEdit);
+void VimEnterInsertModeNewLineAbove(HWND hwndEdit);
+void VimEnterVisualMode(HWND hwndEdit);
+void VimEnterNormalMode(HWND hwndEdit);
+
+/* Search commands */
+void VimSearchForward(HWND hwndEdit, const TCHAR* pattern);
+void VimSearchBackward(HWND hwndEdit, const TCHAR* pattern);
+void VimSearchNext(HWND hwndEdit);
+void VimSearchPrev(HWND hwndEdit);
+
+#endif /* VIM_MODE_H */
