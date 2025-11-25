@@ -757,7 +757,6 @@ BOOL ProcessVimKey(HWND hwndEdit, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (msg != WM_KEYDOWN && msg != WM_CHAR) return FALSE;
     
     int count = (g_VimState.nRepeatCount > 0) ? g_VimState.nRepeatCount : 1;
-    BOOL bShift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
     BOOL bCtrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
     
     /* Handle WM_KEYDOWN for special keys */
