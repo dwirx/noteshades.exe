@@ -1,7 +1,31 @@
 #include "notepad.h"
 
-/* File filter for text files */
-static const TCHAR szFilter[] = TEXT("Text Files (*.txt)\0*.txt\0All Files (*.*)\0*.*\0\0");
+/* File filter for various file types */
+static const TCHAR szFilter[] = 
+    TEXT("All Supported Files\0*.txt;*.md;*.json;*.xml;*.html;*.htm;*.css;*.js;*.ts;*.py;*.c;*.cpp;*.h;*.hpp;*.java;*.go;*.rs;*.sql;*.yaml;*.yml;*.sh;*.bat;*.ps1;*.php;*.rb;*.log;*.ini;*.cfg;*.conf\0")
+    TEXT("Text Files (*.txt)\0*.txt\0")
+    TEXT("Markdown (*.md)\0*.md\0")
+    TEXT("JSON (*.json)\0*.json\0")
+    TEXT("XML (*.xml)\0*.xml\0")
+    TEXT("HTML (*.html, *.htm)\0*.html;*.htm\0")
+    TEXT("CSS (*.css)\0*.css\0")
+    TEXT("JavaScript (*.js)\0*.js\0")
+    TEXT("TypeScript (*.ts)\0*.ts\0")
+    TEXT("Python (*.py)\0*.py\0")
+    TEXT("C/C++ (*.c, *.cpp, *.h, *.hpp)\0*.c;*.cpp;*.h;*.hpp\0")
+    TEXT("Java (*.java)\0*.java\0")
+    TEXT("Go (*.go)\0*.go\0")
+    TEXT("Rust (*.rs)\0*.rs\0")
+    TEXT("SQL (*.sql)\0*.sql\0")
+    TEXT("YAML (*.yaml, *.yml)\0*.yaml;*.yml\0")
+    TEXT("Shell Script (*.sh)\0*.sh\0")
+    TEXT("Batch (*.bat, *.cmd)\0*.bat;*.cmd\0")
+    TEXT("PowerShell (*.ps1)\0*.ps1\0")
+    TEXT("PHP (*.php)\0*.php\0")
+    TEXT("Ruby (*.rb)\0*.rb\0")
+    TEXT("Log Files (*.log)\0*.log\0")
+    TEXT("Config Files (*.ini, *.cfg, *.conf)\0*.ini;*.cfg;*.conf\0")
+    TEXT("All Files (*.*)\0*.*\0\0");
 
 /* Show Open File dialog */
 BOOL ShowOpenDialog(HWND hwnd, TCHAR* szFileName, DWORD nMaxFile) {
