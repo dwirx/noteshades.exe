@@ -479,7 +479,7 @@ void UpdateTabTitle(int nTabIndex) {
         _sntprintf(szTitle, MAX_PATH + 4, TEXT("Untitled%s"), 
                    pTab->bModified ? TEXT(" *") : TEXT(""));
     } else {
-        /* Extract filename from full path */
+        /* Extract filename from full path - include extension */
         TCHAR* pFileName = _tcsrchr(pTab->szFileName, TEXT('\\'));
         if (pFileName) {
             pFileName++;
@@ -494,6 +494,9 @@ void UpdateTabTitle(int nTabIndex) {
     tie.mask = TCIF_TEXT;
     tie.pszText = szTitle;
     TabCtrl_SetItem(g_AppState.hwndTab, nTabIndex, &tie);
+    
+    /* Force tab control to redraw */
+    InvalidateRect(g_AppState.hwndTab, NULL, FALSE);
 }
 
 /* Register main window class */
@@ -577,8 +580,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             /* Subclass tab control to handle mouse events for close button */
             g_OrigTabProc = (WNDPROC)SetWindowLongPtr(g_AppState.hwndTab, GWLP_WNDPROC, (LONG_PTR)TabSubclassProc);
             
-            /* Set tab item size for close button - wider to show full filename with extension */
-            TabCtrl_SetItemSize(g_AppState.hwndTab, 250, TAB_HEIGHT - 4);
+            /* Set tab item size - wide enough for long filenames with extension + close button */
+            TabCtrl_SetItemSize(g_AppState.hwndTab, 220, TAB_HEIGHT - 4);
             
             /* Initialize theme system */
             InitTheme();
@@ -723,12 +726,21 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 tci.cchTextMax = MAX_PATH;
                 TabCtrl_GetItem(g_AppState.hwndTab, pDIS->itemID, &tci);
                 
-                /* Draw text with theme color - no ellipsis to show full filename */
-                rc.left += 8;
-                rc.right -= CLOSE_BTN_SIZE + 8;
+                /* Select font for drawing */
+                HFONT hOldFont = (HFONT)SelectObject(pDIS->hDC, g_hFont);
+                
+                /* Calculate text area - leave space for close button */
+                RECT rcText = rc;
+                rcText.left += 8;
+                rcText.right -= CLOSE_BTN_SIZE + 6;
+                
+                /* Draw text with theme color */
                 SetBkMode(pDIS->hDC, TRANSPARENT);
                 SetTextColor(pDIS->hDC, pTheme->crTabText);
-                DrawText(pDIS->hDC, szText, -1, &rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+                DrawText(pDIS->hDC, szText, -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+                
+                /* Restore font */
+                SelectObject(pDIS->hDC, hOldFont);
                 
                 /* Draw close button (X) */
                 RECT rcClose;
