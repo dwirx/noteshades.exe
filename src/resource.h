@@ -1,6 +1,9 @@
 #ifndef RESOURCE_H
 #define RESOURCE_H
 
+/* Application Icon */
+#define IDI_APPICON 1
+
 /* File menu command IDs */
 #define IDM_FILE_NEW        101
 #define IDM_FILE_OPEN       102

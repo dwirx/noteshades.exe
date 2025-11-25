@@ -1,5 +1,9 @@
 #include <windows.h>
 
+/* Application Icon */
+#define IDI_APPICON 1
+IDI_APPICON ICON "icons/xnote.ico"
+
 /* Menu command IDs */
 #define IDM_FILE_NEW        101
 #define IDM_FILE_OPEN       102

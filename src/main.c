@@ -461,12 +461,16 @@ ATOM RegisterMainWindowClass(HINSTANCE hInstance) {
     wc.cbClsExtra    = 0;
     wc.cbWndExtra    = 0;
     wc.hInstance     = hInstance;
-    wc.hIcon         = LoadIcon(NULL, IDI_APPLICATION);
+    wc.hIcon         = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON));
     wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszMenuName  = MAKEINTRESOURCE(IDR_MAINMENU);
     wc.lpszClassName = szClassName;
-    wc.hIconSm       = LoadIcon(NULL, IDI_APPLICATION);
+    wc.hIconSm       = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON));
+    
+    /* Fallback to default icon if custom icon not found */
+    if (!wc.hIcon) wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    if (!wc.hIconSm) wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
     
     return RegisterClassEx(&wc);
 }
