@@ -66,6 +66,7 @@ typedef struct {
     LineEndingType lineEnding;   /* Line ending type */
     BOOL bInsertMode;            /* Insert/Overwrite mode */
     LanguageType language;       /* Language for syntax highlighting */
+    BOOL bNeedsSyntaxRefresh;    /* Flag for lazy syntax refresh after theme change */
 } TabState;
 
 /* Application state structure */

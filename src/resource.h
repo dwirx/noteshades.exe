@@ -116,6 +116,8 @@
 #define IDM_THEME_ONE_DARK      277
 #define IDM_THEME_NORD          278
 #define IDM_THEME_GRUVBOX       279
+#define IDM_THEME_EVERFOREST_DARK  280
+#define IDM_THEME_EVERFOREST_LIGHT 281
 
 /* Find/Replace dialog IDs */
 #define IDD_FINDREPLACE     500

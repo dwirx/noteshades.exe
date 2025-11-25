@@ -234,6 +234,7 @@ void InitTabState(TabState* pState) {
     pState->lineEnding = LINE_ENDING_CRLF;  /* Default Windows line ending */
     pState->bInsertMode = TRUE;              /* Default insert mode */
     pState->language = LANG_NONE;            /* No syntax highlighting by default */
+    pState->bNeedsSyntaxRefresh = FALSE;     /* No pending syntax refresh */
 }
 
 /* Create edit control for a tab */
@@ -400,9 +401,19 @@ void CloseTab(HWND hwnd, int nTabIndex) {
     }
 }
 
-/* Switch to a specific tab */
+/* Switch to a specific tab - optimized for performance */
 void SwitchToTab(HWND hwnd, int nTabIndex) {
     if (nTabIndex < 0 || nTabIndex >= g_AppState.nTabCount) return;
+    
+    /* Skip if already on this tab and tab is visible */
+    if (nTabIndex == g_AppState.nCurrentTab && 
+        g_AppState.tabs[nTabIndex].hwndEdit &&
+        IsWindowVisible(g_AppState.tabs[nTabIndex].hwndEdit)) {
+        return;
+    }
+    
+    /* Disable redraw during switch for smoother transition */
+    SendMessage(hwnd, WM_SETREDRAW, FALSE, 0);
     
     /* Hide current edit control and line numbers */
     if (g_AppState.nCurrentTab >= 0 && g_AppState.nCurrentTab < g_AppState.nTabCount) {
@@ -431,8 +442,16 @@ void SwitchToTab(HWND hwnd, int nTabIndex) {
     /* Show edit control */
     if (pTab->hwndEdit) {
         ShowWindow(pTab->hwndEdit, SW_SHOW);
-        SetFocus(pTab->hwndEdit);
+        
+        /* Apply lazy syntax refresh if needed (after theme change) */
+        if (pTab->bNeedsSyntaxRefresh && g_bSyntaxHighlight && pTab->language != LANG_NONE) {
+            ApplySyntaxHighlighting(pTab->hwndEdit, pTab->language);
+            pTab->bNeedsSyntaxRefresh = FALSE;
+        }
     }
+    
+    /* Re-enable redraw */
+    SendMessage(hwnd, WM_SETREDRAW, TRUE, 0);
     
     /* Reposition controls */
     RepositionControls(hwnd);
@@ -442,6 +461,11 @@ void SwitchToTab(HWND hwnd, int nTabIndex) {
     
     /* Update window title */
     UpdateWindowTitle(hwnd);
+    
+    /* Set focus after everything is done */
+    if (pTab->hwndEdit) {
+        SetFocus(pTab->hwndEdit);
+    }
 }
 
 /* Update tab title */
@@ -553,8 +577,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             /* Subclass tab control to handle mouse events for close button */
             g_OrigTabProc = (WNDPROC)SetWindowLongPtr(g_AppState.hwndTab, GWLP_WNDPROC, (LONG_PTR)TabSubclassProc);
             
-            /* Set tab item size for close button */
-            TabCtrl_SetItemSize(g_AppState.hwndTab, 120, TAB_HEIGHT - 4);
+            /* Set tab item size for close button - wider to show full filename with extension */
+            TabCtrl_SetItemSize(g_AppState.hwndTab, 250, TAB_HEIGHT - 4);
             
             /* Initialize theme system */
             InitTheme();
@@ -681,12 +705,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_DRAWITEM: {
             DRAWITEMSTRUCT* pDIS = (DRAWITEMSTRUCT*)lParam;
             if (pDIS->CtlID == IDC_TAB) {
-                /* Draw tab with close button */
+                /* Draw tab with close button using theme colors */
                 RECT rc = pDIS->rcItem;
                 BOOL bSelected = (pDIS->itemState & ODS_SELECTED);
+                const ThemeColors* pTheme = GetThemeColors();
                 
-                /* Fill background */
-                FillRect(pDIS->hDC, &rc, (HBRUSH)(bSelected ? COLOR_WINDOW + 1 : COLOR_BTNFACE + 1));
+                /* Fill background with theme color */
+                HBRUSH hBgBrush = CreateSolidBrush(bSelected ? pTheme->crTabActive : pTheme->crTabInactive);
+                FillRect(pDIS->hDC, &rc, hBgBrush);
+                DeleteObject(hBgBrush);
                 
                 /* Get tab text */
                 TCHAR szText[MAX_PATH];
@@ -696,11 +723,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 tci.cchTextMax = MAX_PATH;
                 TabCtrl_GetItem(g_AppState.hwndTab, pDIS->itemID, &tci);
                 
-                /* Draw text */
-                rc.left += 4;
-                rc.right -= CLOSE_BTN_SIZE + 4;
+                /* Draw text with theme color - no ellipsis to show full filename */
+                rc.left += 8;
+                rc.right -= CLOSE_BTN_SIZE + 8;
                 SetBkMode(pDIS->hDC, TRANSPARENT);
-                DrawText(pDIS->hDC, szText, -1, &rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+                SetTextColor(pDIS->hDC, pTheme->crTabText);
+                DrawText(pDIS->hDC, szText, -1, &rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
                 
                 /* Draw close button (X) */
                 RECT rcClose;
@@ -849,14 +877,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     HMENU hMenu = GetMenu(hwnd);
                     CheckMenuItem(hMenu, IDM_VIEW_SYNTAX, 
                                   g_bSyntaxHighlight ? MF_CHECKED : MF_UNCHECKED);
-                    /* Re-apply highlighting */
-                    if (pTab && pTab->hwndEdit) {
-                        if (g_bSyntaxHighlight) {
-                            pTab->language = DetectLanguage(pTab->szFileName);
-                            ApplySyntaxHighlighting(pTab->hwndEdit, pTab->language);
-                        } else {
-                            /* Reset to default color */
-                            SetupSyntaxHighlighting(pTab->hwndEdit, LANG_NONE);
+                    /* Re-apply highlighting to all tabs */
+                    for (int i = 0; i < g_AppState.nTabCount; i++) {
+                        TabState* pTabItem = &g_AppState.tabs[i];
+                        if (pTabItem->hwndEdit) {
+                            if (g_bSyntaxHighlight) {
+                                pTabItem->language = DetectLanguage(pTabItem->szFileName);
+                                ApplySyntaxHighlighting(pTabItem->hwndEdit, pTabItem->language);
+                            } else {
+                                /* Reset to default theme color */
+                                ApplyThemeToEdit(pTabItem->hwndEdit);
+                            }
                         }
                     }
                     /* Mark session dirty to save syntax highlight state */
@@ -907,6 +938,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     break;
                 case IDM_THEME_GRUVBOX:
                     SetTheme(THEME_GRUVBOX_DARK);
+                    ApplyThemeToWindow(hwnd);
+                    break;
+                case IDM_THEME_EVERFOREST_DARK:
+                    SetTheme(THEME_EVERFOREST_DARK);
+                    ApplyThemeToWindow(hwnd);
+                    break;
+                case IDM_THEME_EVERFOREST_LIGHT:
+                    SetTheme(THEME_EVERFOREST_LIGHT);
                     ApplyThemeToWindow(hwnd);
                     break;
                 

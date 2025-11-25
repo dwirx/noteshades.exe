@@ -20,6 +20,8 @@ typedef enum {
     THEME_ONE_DARK,         /* One Dark */
     THEME_NORD,             /* Nord */
     THEME_GRUVBOX_DARK,     /* Gruvbox Dark */
+    THEME_EVERFOREST_DARK,  /* Everforest Dark */
+    THEME_EVERFOREST_LIGHT, /* Everforest Light */
     THEME_COUNT
 } ThemeType;
 

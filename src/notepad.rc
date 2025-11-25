@@ -59,6 +59,8 @@ IDI_APPICON ICON "icons/xnote.ico"
 #define IDM_THEME_ONE_DARK      277
 #define IDM_THEME_NORD          278
 #define IDM_THEME_GRUVBOX       279
+#define IDM_THEME_EVERFOREST_DARK  280
+#define IDM_THEME_EVERFOREST_LIGHT 281
 #define IDM_HELP_ABOUT      301
 #define IDR_MAINMENU        1000
 #define IDR_ACCEL           1001
@@ -129,6 +131,9 @@ BEGIN
             MENUITEM "&One Dark",           IDM_THEME_ONE_DARK
             MENUITEM "&Nord",               IDM_THEME_NORD
             MENUITEM "&Gruvbox Dark",       IDM_THEME_GRUVBOX
+            MENUITEM SEPARATOR
+            MENUITEM "&Everforest Dark",    IDM_THEME_EVERFOREST_DARK
+            MENUITEM "Everforest &Light",   IDM_THEME_EVERFOREST_LIGHT
         END
         MENUITEM SEPARATOR
         MENUITEM "Zoom &In\tCtrl++",        IDM_VIEW_ZOOMIN

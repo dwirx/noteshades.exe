@@ -3,8 +3,8 @@
 #include "theme.h"
 #include <richedit.h>
 
-/* Global syntax highlighting flag - OFF by default for better performance */
-BOOL g_bSyntaxHighlight = FALSE;
+/* Global syntax highlighting flag - ON by default */
+BOOL g_bSyntaxHighlight = TRUE;
 
 /* Get syntax color from current theme */
 COLORREF GetSyntaxColor(SyntaxColorType colorType) {
@@ -298,7 +298,7 @@ static BOOL IsIdentChar(WCHAR ch) {
     return (ch >= L'a' && ch <= L'z') ||
            (ch >= L'A' && ch <= L'Z') ||
            (ch >= L'0' && ch <= L'9') ||
-           ch == L'_';
+           ch == L'_' || ch == L'$';  /* $ is valid in JS identifiers */
 }
 
 /* Check if character is digit */
@@ -307,23 +307,22 @@ static BOOL IsDigit(WCHAR ch) {
 }
 
 /* Set text color for range in RichEdit */
-static void SetRangeColor(HWND hwndEdit, int nStart, int nEnd, COLORREF color) {
+/* Optimized: Set range color with direct COLORREF value */
+static void SetRangeColorDirect(HWND hwndEdit, int nStart, int nEnd, COLORREF color) {
     CHARFORMAT2 cf;
     ZeroMemory(&cf, sizeof(cf));
     cf.cbSize = sizeof(cf);
     cf.dwMask = CFM_COLOR;
     cf.crTextColor = color;
     
-    /* Save current selection */
-    DWORD dwStart, dwEnd;
-    SendMessage(hwndEdit, EM_GETSEL, (WPARAM)&dwStart, (LPARAM)&dwEnd);
-    
-    /* Select range and apply color */
+    /* Select range and apply color - no need to save/restore for batch operations */
     SendMessage(hwndEdit, EM_SETSEL, nStart, nEnd);
     SendMessage(hwndEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
-    
-    /* Restore selection */
-    SendMessage(hwndEdit, EM_SETSEL, dwStart, dwEnd);
+}
+
+/* Legacy wrapper for compatibility */
+static void SetRangeColor(HWND hwndEdit, int nStart, int nEnd, COLORREF color) {
+    SetRangeColorDirect(hwndEdit, nStart, nEnd, color);
 }
 
 /* Get comment style for language */
@@ -383,31 +382,33 @@ void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang) {
     int nLen = GetWindowTextLengthW(hwndEdit);
     if (nLen == 0) return;
     
-    /* SKIP syntax highlighting for very large files (> 100KB) for performance */
-    /* This prevents delay when opening large files */
-    if (nLen > 100000) {
-        return; /* No highlighting for files > 100KB */
+    /* SKIP syntax highlighting for very large files for performance */
+    if (nLen > 30000) {
+        return; /* No highlighting for files > 30KB for better performance */
     }
     
-    /* Limit highlighting to first 15KB for better performance */
-    int nHighlightLen = nLen;
-    if (nHighlightLen > 15000) nHighlightLen = 15000;
+    /* Cache theme colors for performance */
+    const ThemeColors* pTheme = GetThemeColors();
+    COLORREF crDefault = pTheme->crForeground;
+    COLORREF crKeyword = pTheme->crKeyword;
+    COLORREF crString = pTheme->crString;
+    COLORREF crComment = pTheme->crComment;
+    COLORREF crNumber = pTheme->crNumber;
+    COLORREF crPreprocessor = pTheme->crPreprocessor;
     
-    /* Disable redraw for performance */
+    /* Disable redraw and event mask for performance */
     SendMessage(hwndEdit, WM_SETREDRAW, FALSE, 0);
+    DWORD dwOldMask = (DWORD)SendMessage(hwndEdit, EM_SETEVENTMASK, 0, 0);
     
-    /* Allocate buffer - only for the portion we'll highlight */
-    WCHAR* pText = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, (nHighlightLen + 1) * sizeof(WCHAR));
+    /* Allocate buffer for text */
+    WCHAR* pText = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, (nLen + 2) * sizeof(WCHAR));
     if (!pText) {
         SendMessage(hwndEdit, WM_SETREDRAW, TRUE, 0);
         return;
     }
     
-    /* Get only the text we need to highlight */
-    SendMessage(hwndEdit, EM_SETSEL, 0, nHighlightLen);
-    SendMessage(hwndEdit, EM_GETSELTEXT, 0, (LPARAM)pText);
-    pText[nHighlightLen] = L'\0';
-    SendMessage(hwndEdit, EM_SETSEL, 0, 0); /* Deselect */
+    /* Get text content */
+    GetWindowTextW(hwndEdit, pText, nLen + 1);
     
     /* Get comment style */
     WCHAR lineComment[8], blockStart[8], blockEnd[8];
@@ -416,11 +417,8 @@ void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang) {
     int blockStartLen = (int)wcslen(blockStart);
     int blockEndLen = (int)wcslen(blockEnd);
     
-    /* First, set highlighted portion to default color */
-    SetRangeColor(hwndEdit, 0, nHighlightLen, COLOR_DEFAULT);
-    
-    /* Use nHighlightLen instead of nLen for the loop */
-    nLen = nHighlightLen;
+    /* First, set all text to default color */
+    SetRangeColorDirect(hwndEdit, 0, nLen, crDefault);
     
     int i = 0;
     BOOL inBlockComment = FALSE;
@@ -442,23 +440,36 @@ void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang) {
                 }
                 i++;
             }
-            SetRangeColor(hwndEdit, start, i, COLOR_COMMENT);
+            SetRangeColorDirect(hwndEdit, start, i, crComment);
+            continue;
+        }
+        
+        /* Line comment - check BEFORE block comment for languages like C/JS */
+        if (lineCommentLen > 0 && i + lineCommentLen <= nLen &&
+            wcsncmp(&pText[i], lineComment, lineCommentLen) == 0) {
+            int start = i;
+            while (i < nLen && pText[i] != L'\n') i++;
+            SetRangeColorDirect(hwndEdit, start, i, crComment);
             continue;
         }
         
         /* Check for block comment start */
         if (blockStartLen > 0 && i + blockStartLen <= nLen &&
             wcsncmp(&pText[i], blockStart, blockStartLen) == 0) {
-            inBlockComment = TRUE;
-            continue;
-        }
-        
-        /* Line comment */
-        if (lineCommentLen > 0 && i + lineCommentLen <= nLen &&
-            wcsncmp(&pText[i], lineComment, lineCommentLen) == 0) {
             int start = i;
-            while (i < nLen && pText[i] != L'\n') i++;
-            SetRangeColor(hwndEdit, start, i, COLOR_COMMENT);
+            inBlockComment = TRUE;
+            i += blockStartLen;
+            /* Find end of block comment */
+            while (i < nLen) {
+                if (i + blockEndLen <= nLen &&
+                    wcsncmp(&pText[i], blockEnd, blockEndLen) == 0) {
+                    i += blockEndLen;
+                    inBlockComment = FALSE;
+                    break;
+                }
+                i++;
+            }
+            SetRangeColorDirect(hwndEdit, start, i, crComment);
             continue;
         }
         
@@ -490,12 +501,12 @@ void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang) {
                 int j = i;
                 while (j < nLen && (pText[j] == L' ' || pText[j] == L'\t')) j++;
                 if (j < nLen && pText[j] == L':') {
-                    SetRangeColor(hwndEdit, start, i, COLOR_KEYWORD); /* Keys in blue */
+                    SetRangeColorDirect(hwndEdit, start, i, crKeyword);
                 } else {
-                    SetRangeColor(hwndEdit, start, i, COLOR_STRING);
+                    SetRangeColorDirect(hwndEdit, start, i, crString);
                 }
             } else {
-                SetRangeColor(hwndEdit, start, i, COLOR_STRING);
+                SetRangeColorDirect(hwndEdit, start, i, crString);
             }
             continue;
         }
@@ -504,7 +515,7 @@ void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang) {
         if ((lang == LANG_C || lang == LANG_CPP) && pText[i] == L'#') {
             int start = i;
             while (i < nLen && pText[i] != L'\n') i++;
-            SetRangeColor(hwndEdit, start, i, COLOR_PREPROCESSOR);
+            SetRangeColorDirect(hwndEdit, start, i, crPreprocessor);
             continue;
         }
         
@@ -531,7 +542,7 @@ void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang) {
                        pText[i] == L'l' || pText[i] == L'L' ||
                        pText[i] == L'u' || pText[i] == L'U')) i++;
             }
-            SetRangeColor(hwndEdit, start, i, COLOR_NUMBER);
+            SetRangeColorDirect(hwndEdit, start, i, crNumber);
             continue;
         }
         
@@ -542,7 +553,7 @@ void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang) {
             int len = i - start;
             
             if (IsKeyword(&pText[start], len, lang)) {
-                SetRangeColor(hwndEdit, start, i, COLOR_KEYWORD);
+                SetRangeColorDirect(hwndEdit, start, i, crKeyword);
             }
             continue;
         }
@@ -585,9 +596,13 @@ void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang) {
     
     HeapFree(GetProcessHeap(), 0, pText);
     
-    /* Re-enable redraw */
+    /* Restore selection to start */
+    SendMessage(hwndEdit, EM_SETSEL, 0, 0);
+    
+    /* Restore event mask and re-enable redraw */
+    SendMessage(hwndEdit, EM_SETEVENTMASK, 0, dwOldMask);
     SendMessage(hwndEdit, WM_SETREDRAW, TRUE, 0);
-    InvalidateRect(hwndEdit, NULL, TRUE);
+    InvalidateRect(hwndEdit, NULL, FALSE);
 }
 
 /* Setup syntax highlighting for edit control */

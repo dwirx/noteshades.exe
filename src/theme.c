@@ -304,6 +304,64 @@ static const Theme g_Themes[] = {
             RGB(40, 40, 40),     /* Status text */
         }
     },
+
+    /* THEME_EVERFOREST_DARK - Everforest Dark */
+    {
+        THEME_EVERFOREST_DARK,
+        TEXT("Everforest Dark"),
+        {
+            RGB(45, 53, 59),     /* Background - #2d353b */
+            RGB(211, 198, 170),  /* Foreground - #d3c6aa */
+            RGB(133, 146, 137),  /* Line number - #859289 */
+            RGB(37, 44, 49),     /* Line num bg - #252c31 */
+            RGB(52, 61, 67),     /* Current line - #343d43 */
+            RGB(84, 96, 88),     /* Selection - #546058 */
+            RGB(211, 198, 170),  /* Cursor */
+            RGB(133, 146, 137),  /* Comment - #859289 */
+            RGB(230, 126, 128),  /* Keyword - #e67e80 (red) */
+            RGB(167, 192, 128),  /* String - #a7c080 (green) */
+            RGB(219, 188, 127),  /* Number - #dbbc7f (yellow) */
+            RGB(127, 187, 179),  /* Function - #7fbbb3 (aqua) */
+            RGB(131, 192, 146),  /* Type - #83c092 (green) */
+            RGB(211, 198, 170),  /* Operator */
+            RGB(230, 152, 117),  /* Preprocessor - #e69875 (orange) */
+            RGB(37, 44, 49),     /* Tab bg */
+            RGB(45, 53, 59),     /* Tab active */
+            RGB(52, 61, 67),     /* Tab inactive */
+            RGB(211, 198, 170),  /* Tab text */
+            RGB(167, 192, 128),  /* Status bg - #a7c080 */
+            RGB(45, 53, 59),     /* Status text */
+        }
+    },
+
+    /* THEME_EVERFOREST_LIGHT - Everforest Light */
+    {
+        THEME_EVERFOREST_LIGHT,
+        TEXT("Everforest Light"),
+        {
+            RGB(253, 246, 227),  /* Background - #fdf6e3 */
+            RGB(92, 107, 100),   /* Foreground - #5c6b64 */
+            RGB(147, 159, 149),  /* Line number - #939f95 */
+            RGB(239, 239, 221),  /* Line num bg - #efefdd */
+            RGB(243, 234, 211),  /* Current line - #f3ead3 */
+            RGB(224, 218, 195),  /* Selection - #e0dac3 */
+            RGB(92, 107, 100),   /* Cursor */
+            RGB(147, 159, 149),  /* Comment - #939f95 */
+            RGB(241, 96, 88),    /* Keyword - #f15850 (red) */
+            RGB(141, 163, 89),   /* String - #8da359 (green) */
+            RGB(223, 165, 73),   /* Number - #dfa549 (yellow) */
+            RGB(53, 163, 163),   /* Function - #35a3a3 (aqua) */
+            RGB(141, 163, 89),   /* Type - #8da359 (green) */
+            RGB(92, 107, 100),   /* Operator */
+            RGB(241, 130, 73),   /* Preprocessor - #f18249 (orange) */
+            RGB(239, 239, 221),  /* Tab bg */
+            RGB(253, 246, 227),  /* Tab active */
+            RGB(243, 234, 211),  /* Tab inactive */
+            RGB(92, 107, 100),   /* Tab text */
+            RGB(141, 163, 89),   /* Status bg */
+            RGB(253, 246, 227),  /* Status text */
+        }
+    },
 };
 
 
@@ -368,37 +426,50 @@ void ApplyThemeToEdit(HWND hwndEdit) {
     InvalidateRect(hwndEdit, NULL, TRUE);
 }
 
-/* Apply theme to main window and all controls */
+/* Apply theme to main window and all controls - optimized for performance */
 void ApplyThemeToWindow(HWND hwnd) {
     if (!hwnd) return;
     
-    /* Apply to all edit controls in tabs */
+    /* Disable redraw during theme change for smoother transition */
+    SendMessage(hwnd, WM_SETREDRAW, FALSE, 0);
+    
+    /* Apply to all edit controls in tabs - but only syntax highlight current tab */
     for (int i = 0; i < g_AppState.nTabCount; i++) {
         if (g_AppState.tabs[i].hwndEdit) {
+            /* Apply basic theme colors (fast) */
             ApplyThemeToEdit(g_AppState.tabs[i].hwndEdit);
             
-            /* Re-apply syntax highlighting with new theme colors */
-            if (g_bSyntaxHighlight && g_AppState.tabs[i].language != LANG_NONE) {
-                ApplySyntaxHighlighting(g_AppState.tabs[i].hwndEdit, g_AppState.tabs[i].language);
-            }
-        }
-        
-        /* Refresh line numbers */
-        if (g_AppState.tabs[i].lineNumState.hwndLineNumbers) {
-            InvalidateRect(g_AppState.tabs[i].lineNumState.hwndLineNumbers, NULL, TRUE);
+            /* Mark tab as needing syntax re-highlight (lazy) */
+            g_AppState.tabs[i].bNeedsSyntaxRefresh = TRUE;
         }
     }
     
+    /* Only apply syntax highlighting to current visible tab */
+    if (g_AppState.nCurrentTab >= 0 && g_AppState.nCurrentTab < g_AppState.nTabCount) {
+        TabState* pTab = &g_AppState.tabs[g_AppState.nCurrentTab];
+        if (pTab->hwndEdit && g_bSyntaxHighlight && pTab->language != LANG_NONE) {
+            ApplySyntaxHighlighting(pTab->hwndEdit, pTab->language);
+            pTab->bNeedsSyntaxRefresh = FALSE;
+        }
+        /* Refresh current line numbers */
+        if (pTab->lineNumState.hwndLineNumbers) {
+            InvalidateRect(pTab->lineNumState.hwndLineNumbers, NULL, FALSE);
+        }
+    }
+    
+    /* Re-enable redraw */
+    SendMessage(hwnd, WM_SETREDRAW, TRUE, 0);
+    
     /* Refresh tab control */
     if (g_AppState.hwndTab) {
-        InvalidateRect(g_AppState.hwndTab, NULL, TRUE);
+        InvalidateRect(g_AppState.hwndTab, NULL, FALSE);
     }
     
     /* Refresh status bar */
     if (g_AppState.hwndStatus) {
-        InvalidateRect(g_AppState.hwndStatus, NULL, TRUE);
+        InvalidateRect(g_AppState.hwndStatus, NULL, FALSE);
     }
     
     /* Refresh main window */
-    InvalidateRect(hwnd, NULL, TRUE);
+    RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
 }
