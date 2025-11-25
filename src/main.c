@@ -14,6 +14,9 @@ static const TCHAR szClassName[] = TEXT("NotepadMainWindow");
 /* Font handle for edit control */
 static HFONT g_hFont = NULL;
 
+/* Font handle for tab control - smaller font for better fit */
+static HFONT g_hTabFont = NULL;
+
 /* Set global font handle */
 void SetGlobalFont(HFONT hFont) {
     if (g_hFont && g_hFont != hFont) {
@@ -560,28 +563,40 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             /* Create font for edit controls - will be updated after session load */
             g_hFont = GetCurrentFontHandle();
             
+            /* Create smaller font for tab control - use system UI font */
+            {
+                NONCLIENTMETRICS ncm;
+                ncm.cbSize = sizeof(ncm);
+                SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
+                g_hTabFont = CreateFontIndirect(&ncm.lfMenuFont);
+            }
+            
             /* Create status bar */
             g_AppState.hwndStatus = CreateStatusBar(hwnd, g_AppState.hInstance);
             
             /* Create tab control with owner draw for close buttons */
+            /* TCS_FIXEDWIDTH ensures all tabs have the same width set by TCM_SETITEMSIZE */
             g_AppState.hwndTab = CreateWindowEx(
                 0,
                 WC_TABCONTROL,
                 TEXT(""),
-                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_TABS | TCS_OWNERDRAWFIXED,
+                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_TABS | TCS_OWNERDRAWFIXED | TCS_FIXEDWIDTH,
                 0, 0, 0, TAB_HEIGHT,
                 hwnd,
                 (HMENU)IDC_TAB,
                 g_AppState.hInstance,
                 NULL
             );
-            SendMessage(g_AppState.hwndTab, WM_SETFONT, (WPARAM)g_hFont, TRUE);
+            /* Use smaller tab font for better text fit */
+            SendMessage(g_AppState.hwndTab, WM_SETFONT, (WPARAM)g_hTabFont, TRUE);
             
             /* Subclass tab control to handle mouse events for close button */
             g_OrigTabProc = (WNDPROC)SetWindowLongPtr(g_AppState.hwndTab, GWLP_WNDPROC, (LONG_PTR)TabSubclassProc);
             
             /* Set tab item size - wide enough for long filenames with extension + close button */
-            TabCtrl_SetItemSize(g_AppState.hwndTab, 220, TAB_HEIGHT - 4);
+            /* TCM_SETITEMSIZE with TCS_FIXEDWIDTH ensures fixed width tabs */
+            /* Width: 200px should be enough for most filenames with smaller font */
+            SendMessage(g_AppState.hwndTab, TCM_SETITEMSIZE, 0, MAKELPARAM(200, TAB_HEIGHT - 4));
             
             /* Initialize theme system */
             InitTheme();
@@ -726,13 +741,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 tci.cchTextMax = MAX_PATH;
                 TabCtrl_GetItem(g_AppState.hwndTab, pDIS->itemID, &tci);
                 
-                /* Select font for drawing */
-                HFONT hOldFont = (HFONT)SelectObject(pDIS->hDC, g_hFont);
+                /* Select tab font for drawing (smaller than edit font) */
+                HFONT hOldFont = (HFONT)SelectObject(pDIS->hDC, g_hTabFont ? g_hTabFont : g_hFont);
                 
-                /* Calculate text area - leave space for close button */
+                /* Calculate text area - minimal margins to maximize text space */
                 RECT rcText = rc;
-                rcText.left += 8;
-                rcText.right -= CLOSE_BTN_SIZE + 6;
+                rcText.left += 4;
+                rcText.right -= CLOSE_BTN_SIZE + 2;
                 
                 /* Draw text with theme color */
                 SetBkMode(pDIS->hDC, TRANSPARENT);
@@ -1089,6 +1104,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             if (g_hFont) {
                 DeleteObject(g_hFont);
                 g_hFont = NULL;
+            }
+            if (g_hTabFont) {
+                DeleteObject(g_hTabFont);
+                g_hTabFont = NULL;
             }
             PostQuitMessage(0);
             return 0;
