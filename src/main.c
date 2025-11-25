@@ -741,6 +741,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     if (hwndEdit) EditSelectAll(hwndEdit);
                     break;
                 
+                /* Find/Replace */
+                case IDM_EDIT_FIND:
+                    ShowFindDialog(hwnd);
+                    break;
+                case IDM_EDIT_REPLACE:
+                    ShowReplaceDialog(hwnd);
+                    break;
+                case IDM_EDIT_FINDNEXT:
+                    FindNext(hwnd);
+                    break;
+                
                 /* Format menu */
                 case IDM_FORMAT_WORDWRAP:
                     ToggleWordWrap(hwnd);
@@ -771,6 +782,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 }
                 
                 /* Help menu */
+                case IDM_HELP_CONTENTS:
+                    ShowHelpDialog(hwnd);
+                    break;
                 case IDM_HELP_ABOUT:
                     ShowAboutDialog(hwnd);
                     break;

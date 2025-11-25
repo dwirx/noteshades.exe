@@ -14,6 +14,12 @@
 #define IDM_EDIT_COPY       203
 #define IDM_EDIT_PASTE      204
 #define IDM_EDIT_SELECTALL  205
+#define IDM_EDIT_FIND       206
+#define IDM_EDIT_REPLACE    207
+#define IDM_EDIT_FINDNEXT   208
+
+/* Help menu command IDs */
+#define IDM_HELP_CONTENTS   302
 
 /* Format menu command IDs */
 #define IDM_FORMAT_WORDWRAP 251
@@ -62,5 +68,19 @@
 
 /* Timer IDs */
 #define TIMER_STATUSBAR     4
+
+/* Find/Replace dialog IDs */
+#define IDD_FINDREPLACE     500
+#define IDC_FIND_TEXT       501
+#define IDC_REPLACE_TEXT    502
+#define IDC_FIND_NEXT       503
+#define IDC_REPLACE         504
+#define IDC_REPLACE_ALL     505
+#define IDC_MATCH_CASE      506
+#define IDC_WHOLE_WORD      507
+
+/* Help dialog ID */
+#define IDD_HELP            600
+#define IDC_HELP_TEXT       601
 
 #endif /* RESOURCE_H */

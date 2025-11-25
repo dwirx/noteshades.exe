@@ -112,6 +112,18 @@ int ShowConfirmSaveDialog(HWND hwnd);
 void ShowAboutDialog(HWND hwnd);
 void ShowErrorDialog(HWND hwnd, const TCHAR* szMessage);
 
+/* Find/Replace operations */
+void ShowFindDialog(HWND hwnd);
+void ShowReplaceDialog(HWND hwnd);
+void FindNext(HWND hwnd);
+void ReplaceCurrent(HWND hwnd);
+void ReplaceAll(HWND hwnd);
+INT_PTR CALLBACK FindReplaceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+
+/* Help dialog */
+void ShowHelpDialog(HWND hwnd);
+INT_PTR CALLBACK HelpDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+
 /* Helper functions */
 void InitTabState(TabState* pState);
 BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName);

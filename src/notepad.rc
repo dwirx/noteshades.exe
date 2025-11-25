@@ -1,3 +1,5 @@
+#include <windows.h>
+
 /* Menu command IDs */
 #define IDM_FILE_NEW        101
 #define IDM_FILE_OPEN       102
@@ -11,6 +13,10 @@
 #define IDM_EDIT_COPY       203
 #define IDM_EDIT_PASTE      204
 #define IDM_EDIT_SELECTALL  205
+#define IDM_EDIT_FIND       206
+#define IDM_EDIT_REPLACE    207
+#define IDM_EDIT_FINDNEXT   208
+#define IDM_HELP_CONTENTS   302
 #define IDM_FORMAT_WORDWRAP 251
 #define IDM_VIEW_LINENUMBERS 261
 #define IDM_VIEW_SYNTAX      262
@@ -42,6 +48,10 @@ BEGIN
         MENUITEM "&Paste\tCtrl+V",          IDM_EDIT_PASTE
         MENUITEM SEPARATOR
         MENUITEM "Select &All\tCtrl+A",     IDM_EDIT_SELECTALL
+        MENUITEM SEPARATOR
+        MENUITEM "&Find...\tCtrl+F",        IDM_EDIT_FIND
+        MENUITEM "Find &Next\tF3",          IDM_EDIT_FINDNEXT
+        MENUITEM "&Replace...\tCtrl+H",     IDM_EDIT_REPLACE
     END
     POPUP "F&ormat"
     BEGIN
@@ -54,6 +64,8 @@ BEGIN
     END
     POPUP "&Help"
     BEGIN
+        MENUITEM "&Help Contents\tF1",      IDM_HELP_CONTENTS
+        MENUITEM SEPARATOR
         MENUITEM "&About",                  IDM_HELP_ABOUT
     END
 END
@@ -71,4 +83,101 @@ BEGIN
     "C",    IDM_EDIT_COPY,      VIRTKEY, CONTROL
     "V",    IDM_EDIT_PASTE,     VIRTKEY, CONTROL
     "A",    IDM_EDIT_SELECTALL, VIRTKEY, CONTROL
+    "F",    IDM_EDIT_FIND,      VIRTKEY, CONTROL
+    "H",    IDM_EDIT_REPLACE,   VIRTKEY, CONTROL
+    VK_F3,  IDM_EDIT_FINDNEXT,  VIRTKEY
+    VK_F1,  IDM_HELP_CONTENTS,  VIRTKEY
+END
+
+/* Find/Replace Dialog IDs */
+#define IDD_FINDREPLACE     500
+#define IDC_FIND_TEXT       501
+#define IDC_REPLACE_TEXT    502
+#define IDC_FIND_NEXT       503
+#define IDC_REPLACE         504
+#define IDC_REPLACE_ALL     505
+#define IDC_MATCH_CASE      506
+#define IDC_WHOLE_WORD      507
+
+/* Help Dialog ID */
+#define IDD_HELP            600
+#define IDC_HELP_TEXT       601
+
+/* Find and Replace Dialog */
+IDD_FINDREPLACE DIALOGEX 0, 0, 280, 120
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Find and Replace"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT           "Find what:",1000,10,12,50,10
+    EDITTEXT        IDC_FIND_TEXT,65,10,140,14,ES_AUTOHSCROLL
+    LTEXT           "Replace with:",1001,10,32,50,10
+    EDITTEXT        IDC_REPLACE_TEXT,65,30,140,14,ES_AUTOHSCROLL
+    CONTROL         "Match case",IDC_MATCH_CASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,55,60,10
+    CONTROL         "Whole word",IDC_WHOLE_WORD,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,80,55,60,10
+    PUSHBUTTON      "Find Next",IDC_FIND_NEXT,215,10,55,14
+    PUSHBUTTON      "Replace",IDC_REPLACE,215,30,55,14
+    PUSHBUTTON      "Replace All",IDC_REPLACE_ALL,215,50,55,14
+    PUSHBUTTON      "Close",IDCANCEL,215,95,55,14
+END
+
+/* Help Dialog */
+IDD_HELP DIALOGEX 0, 0, 350, 320
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "XNote Help - Keyboard Shortcuts"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT           "XNote - Fast and Lightweight Text Editor",1100,10,10,200,12
+    LTEXT           "Version 1.0",1101,10,22,100,10
+    
+    LTEXT           "FILE OPERATIONS",1102,10,42,100,10
+    LTEXT           "Ctrl+N",1103,20,56,40,10
+    LTEXT           "New document",1104,70,56,100,10
+    LTEXT           "Ctrl+T",1105,20,68,40,10
+    LTEXT           "New tab",1106,70,68,100,10
+    LTEXT           "Ctrl+O",1107,20,80,40,10
+    LTEXT           "Open file",1108,70,80,100,10
+    LTEXT           "Ctrl+S",1109,20,92,40,10
+    LTEXT           "Save file",1110,70,92,100,10
+    LTEXT           "Ctrl+W",1111,20,104,40,10
+    LTEXT           "Close tab",1112,70,104,100,10
+    
+    LTEXT           "EDIT OPERATIONS",1113,10,124,100,10
+    LTEXT           "Ctrl+Z",1114,20,138,40,10
+    LTEXT           "Undo",1115,70,138,100,10
+    LTEXT           "Ctrl+X",1116,20,150,40,10
+    LTEXT           "Cut",1117,70,150,100,10
+    LTEXT           "Ctrl+C",1118,20,162,40,10
+    LTEXT           "Copy",1119,70,162,100,10
+    LTEXT           "Ctrl+V",1120,20,174,40,10
+    LTEXT           "Paste",1121,70,174,100,10
+    LTEXT           "Ctrl+A",1122,20,186,40,10
+    LTEXT           "Select all",1123,70,186,100,10
+    
+    LTEXT           "FIND & REPLACE",1124,180,42,100,10
+    LTEXT           "Ctrl+F",1125,190,56,40,10
+    LTEXT           "Find",1126,240,56,100,10
+    LTEXT           "Ctrl+H",1127,190,68,40,10
+    LTEXT           "Find and Replace",1128,240,68,100,10
+    LTEXT           "F3",1129,190,80,40,10
+    LTEXT           "Find next",1130,240,80,100,10
+    
+    LTEXT           "VIEW OPTIONS",1131,180,100,100,10
+    LTEXT           "View > Line Numbers",1132,190,114,150,10
+    LTEXT           "Toggle line numbers",1133,190,126,150,10
+    LTEXT           "View > Syntax Highlighting",1134,190,142,150,10
+    LTEXT           "Toggle syntax colors",1135,190,154,150,10
+    LTEXT           "Format > Word Wrap",1136,190,170,150,10
+    LTEXT           "Toggle word wrap",1137,190,182,150,10
+    
+    LTEXT           "SUPPORTED FILE TYPES",1138,10,206,150,10
+    LTEXT           "C, C++, Java, JavaScript, TypeScript, Python, Go, Rust,",1139,20,220,320,10
+    LTEXT           "HTML, CSS, JSON, XML, YAML, SQL, PHP, Ruby, Shell,",1140,20,232,320,10
+    LTEXT           "Batch, PowerShell, Markdown, and more...",1141,20,244,320,10
+    
+    LTEXT           "TIPS",1142,10,264,100,10
+    LTEXT           "- Click X on tab to close it",1143,20,278,200,10
+    LTEXT           "- Status bar shows cursor position and file info",1144,20,290,250,10
+    
+    PUSHBUTTON      "OK",IDOK,145,300,60,14
 END
