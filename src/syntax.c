@@ -1,9 +1,42 @@
 #include "notepad.h"
 #include "syntax.h"
+#include "theme.h"
 #include <richedit.h>
 
 /* Global syntax highlighting flag - OFF by default for better performance */
 BOOL g_bSyntaxHighlight = FALSE;
+
+/* Get syntax color from current theme */
+COLORREF GetSyntaxColor(SyntaxColorType colorType) {
+    const ThemeColors* pTheme = GetThemeColors();
+    
+    switch (colorType) {
+        case SYNTAX_COLOR_KEYWORD:
+            return pTheme->crKeyword;
+        case SYNTAX_COLOR_STRING:
+            return pTheme->crString;
+        case SYNTAX_COLOR_COMMENT:
+            return pTheme->crComment;
+        case SYNTAX_COLOR_NUMBER:
+            return pTheme->crNumber;
+        case SYNTAX_COLOR_PREPROCESSOR:
+            return pTheme->crPreprocessor;
+        case SYNTAX_COLOR_TYPE:
+            return pTheme->crType;
+        case SYNTAX_COLOR_FUNCTION:
+            return pTheme->crFunction;
+        case SYNTAX_COLOR_OPERATOR:
+            return pTheme->crOperator;
+        case SYNTAX_COLOR_DEFAULT:
+            return pTheme->crForeground;
+        case SYNTAX_COLOR_VARIABLE:
+            return pTheme->crFunction;
+        case SYNTAX_COLOR_CONSTANT:
+            return pTheme->crNumber;
+        default:
+            return pTheme->crForeground;
+    }
+}
 
 /* C/C++ keywords */
 static const WCHAR* g_CKeywords[] = {

@@ -7,23 +7,41 @@
 
 /* LanguageType is defined in notepad.h to avoid circular dependency */
 
-/* Syntax colors - Light theme (for white background) */
-#define COLOR_KEYWORD       RGB(0, 0, 255)       /* Blue - keywords */
-#define COLOR_STRING        RGB(163, 21, 21)     /* Dark red - strings */
-#define COLOR_COMMENT       RGB(0, 128, 0)       /* Green - comments */
-#define COLOR_NUMBER        RGB(9, 134, 88)      /* Teal - numbers */
-#define COLOR_PREPROCESSOR  RGB(128, 128, 128)   /* Gray - preprocessor */
-#define COLOR_TYPE          RGB(43, 145, 175)    /* Cyan - types */
-#define COLOR_FUNCTION      RGB(116, 83, 31)     /* Brown - functions */
-#define COLOR_OPERATOR      RGB(0, 0, 0)         /* Black - operators */
-#define COLOR_DEFAULT       RGB(0, 0, 0)         /* Black - default text */
-#define COLOR_TAG           RGB(128, 0, 0)       /* Dark red - HTML tags */
-#define COLOR_ATTRIBUTE     RGB(255, 0, 0)       /* Red - attributes */
-#define COLOR_VARIABLE      RGB(0, 16, 128)      /* Dark blue - variables */
-#define COLOR_CONSTANT      RGB(9, 134, 88)      /* Teal - constants */
+/* Syntax color types */
+typedef enum {
+    SYNTAX_COLOR_KEYWORD = 0,
+    SYNTAX_COLOR_STRING,
+    SYNTAX_COLOR_COMMENT,
+    SYNTAX_COLOR_NUMBER,
+    SYNTAX_COLOR_PREPROCESSOR,
+    SYNTAX_COLOR_TYPE,
+    SYNTAX_COLOR_FUNCTION,
+    SYNTAX_COLOR_OPERATOR,
+    SYNTAX_COLOR_DEFAULT,
+    SYNTAX_COLOR_TAG,
+    SYNTAX_COLOR_ATTRIBUTE,
+    SYNTAX_COLOR_VARIABLE,
+    SYNTAX_COLOR_CONSTANT,
+    SYNTAX_COLOR_COUNT
+} SyntaxColorType;
 
-/* Background color */
-#define SYNTAX_COLOR_BG     RGB(255, 255, 255)   /* White background */
+/* Get syntax color from current theme */
+COLORREF GetSyntaxColor(SyntaxColorType colorType);
+
+/* Legacy macros for compatibility - now use theme colors */
+#define COLOR_KEYWORD       GetSyntaxColor(SYNTAX_COLOR_KEYWORD)
+#define COLOR_STRING        GetSyntaxColor(SYNTAX_COLOR_STRING)
+#define COLOR_COMMENT       GetSyntaxColor(SYNTAX_COLOR_COMMENT)
+#define COLOR_NUMBER        GetSyntaxColor(SYNTAX_COLOR_NUMBER)
+#define COLOR_PREPROCESSOR  GetSyntaxColor(SYNTAX_COLOR_PREPROCESSOR)
+#define COLOR_TYPE          GetSyntaxColor(SYNTAX_COLOR_TYPE)
+#define COLOR_FUNCTION      GetSyntaxColor(SYNTAX_COLOR_FUNCTION)
+#define COLOR_OPERATOR      GetSyntaxColor(SYNTAX_COLOR_OPERATOR)
+#define COLOR_DEFAULT       GetSyntaxColor(SYNTAX_COLOR_DEFAULT)
+#define COLOR_TAG           GetSyntaxColor(SYNTAX_COLOR_PREPROCESSOR)
+#define COLOR_ATTRIBUTE     GetSyntaxColor(SYNTAX_COLOR_STRING)
+#define COLOR_VARIABLE      GetSyntaxColor(SYNTAX_COLOR_VARIABLE)
+#define COLOR_CONSTANT      GetSyntaxColor(SYNTAX_COLOR_NUMBER)
 
 /* Syntax highlighting functions */
 LanguageType DetectLanguage(const TCHAR* szFileName);

@@ -6,6 +6,7 @@
 #include "theme.h"
 #include "notepad.h"
 #include "session.h"
+#include "syntax.h"
 #include <richedit.h>
 
 /* Global theme state */
@@ -375,6 +376,11 @@ void ApplyThemeToWindow(HWND hwnd) {
     for (int i = 0; i < g_AppState.nTabCount; i++) {
         if (g_AppState.tabs[i].hwndEdit) {
             ApplyThemeToEdit(g_AppState.tabs[i].hwndEdit);
+            
+            /* Re-apply syntax highlighting with new theme colors */
+            if (g_bSyntaxHighlight && g_AppState.tabs[i].language != LANG_NONE) {
+                ApplySyntaxHighlighting(g_AppState.tabs[i].hwndEdit, g_AppState.tabs[i].language);
+            }
         }
         
         /* Refresh line numbers */
