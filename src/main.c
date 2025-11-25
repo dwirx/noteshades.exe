@@ -457,10 +457,10 @@ HWND CreateMainWindow(HINSTANCE hInstance, int nCmdShow) {
     HWND hwnd = CreateWindowEx(
         0,
         szClassName,
-        TEXT("Untitled - Notepad"),
+        TEXT("Untitled - XNote"),
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
-        1024, 768,
+        1200, 800,
         NULL,
         NULL,
         hInstance,
@@ -518,8 +518,38 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
         
         case WM_SIZE: {
-            /* Use RepositionControls to handle all control positioning */
-            RepositionControls(hwnd);
+            /* Debounce resize - use timer to avoid too many redraws */
+            SetTimer(hwnd, 3, 16, NULL); /* ~60fps */
+            return 0;
+        }
+        
+        case WM_TIMER: {
+            if (wParam == 1) {
+                /* Scroll sync timer */
+                KillTimer(hwnd, 1);
+                TabState* pTab = GetCurrentTabState();
+                if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                    InvalidateRect(pTab->lineNumState.hwndLineNumbers, NULL, FALSE);
+                }
+            } else if (wParam == 2) {
+                /* Periodic sync timer for line numbers - only sync if scroll position changed */
+                TabState* pTab = GetCurrentTabState();
+                if (pTab && pTab->hwndEdit && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                    static int s_nLastFirstLine = -1;
+                    static int s_nLastLineCount = -1;
+                    int nFirstLine = (int)SendMessage(pTab->hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
+                    int nLineCount = (int)SendMessage(pTab->hwndEdit, EM_GETLINECOUNT, 0, 0);
+                    if (nFirstLine != s_nLastFirstLine || nLineCount != s_nLastLineCount) {
+                        s_nLastFirstLine = nFirstLine;
+                        s_nLastLineCount = nLineCount;
+                        InvalidateRect(pTab->lineNumState.hwndLineNumbers, NULL, FALSE);
+                    }
+                }
+            } else if (wParam == 3) {
+                /* Resize debounce timer */
+                KillTimer(hwnd, 3);
+                RepositionControls(hwnd);
+            }
             return 0;
         }
         
@@ -528,32 +558,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             /* Sync line numbers when scrolling */
             TabState* pTab = GetCurrentTabState();
             if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
-                /* Use a timer to sync after scroll completes */
-                SetTimer(hwnd, 1, 10, NULL);
+                SetTimer(hwnd, 1, 16, NULL);
             }
             break;
-        }
-        
-        case WM_TIMER: {
-            if (wParam == 1) {
-                KillTimer(hwnd, 1);
-                TabState* pTab = GetCurrentTabState();
-                if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
-                    SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
-                }
-            } else if (wParam == 2) {
-                /* Periodic sync timer for line numbers */
-                TabState* pTab = GetCurrentTabState();
-                if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
-                    static int s_nLastFirstLine = -1;
-                    int nFirstLine = (int)SendMessage(pTab->hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
-                    if (nFirstLine != s_nLastFirstLine) {
-                        s_nLastFirstLine = nFirstLine;
-                        SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
-                    }
-                }
-            }
-            return 0;
         }
         
         case WM_NOTIFY: {
@@ -789,9 +796,9 @@ void ToggleWordWrap(HWND hwnd) {
     CheckMenuItem(hMenu, IDM_FORMAT_WORDWRAP, 
                   g_AppState.bWordWrap ? MF_CHECKED : MF_UNCHECKED);
     
-    /* Recreate all edit controls with new style */
-    for (int i = 0; i < g_AppState.nTabCount; i++) {
-        RecreateEditControl(hwnd, i, g_AppState.bWordWrap);
+    /* Only recreate current tab's edit control for better performance */
+    if (g_AppState.nCurrentTab >= 0) {
+        RecreateEditControl(hwnd, g_AppState.nCurrentTab, g_AppState.bWordWrap);
     }
 }
 
@@ -802,38 +809,67 @@ void RecreateEditControl(HWND hwnd, int nTabIndex, BOOL bWordWrap) {
     TabState* pTab = &g_AppState.tabs[nTabIndex];
     HWND hwndOldEdit = pTab->hwndEdit;
     
-    /* Get current text */
-    int nLen = GetWindowTextLength(hwndOldEdit);
-    TCHAR* pText = NULL;
+    if (!hwndOldEdit) return;
+    
+    /* Stop timers during recreation to prevent crashes */
+    KillTimer(hwnd, 1);
+    KillTimer(hwnd, 2);
+    KillTimer(hwnd, 3);
+    
+    /* Disable redraw during recreation */
+    SendMessage(hwnd, WM_SETREDRAW, FALSE, 0);
+    
+    /* Get current text using wide char for better performance */
+    int nLen = GetWindowTextLengthW(hwndOldEdit);
+    WCHAR* pText = NULL;
+    BOOL bWasModified = pTab->bModified;
     
     if (nLen > 0) {
-        pText = (TCHAR*)HeapAlloc(GetProcessHeap(), 0, (nLen + 1) * sizeof(TCHAR));
+        pText = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, (nLen + 1) * sizeof(WCHAR));
         if (pText) {
-            GetWindowText(hwndOldEdit, pText, nLen + 1);
+            GetWindowTextW(hwndOldEdit, pText, nLen + 1);
         }
     }
     
     /* Destroy old edit control */
     DestroyWindow(hwndOldEdit);
+    pTab->hwndEdit = NULL;
     
     /* Create new edit control */
     pTab->hwndEdit = CreateTabEditControl(hwnd, bWordWrap);
     
+    if (!pTab->hwndEdit) {
+        /* Failed to create - cleanup and return */
+        if (pText) HeapFree(GetProcessHeap(), 0, pText);
+        SendMessage(hwnd, WM_SETREDRAW, TRUE, 0);
+        return;
+    }
+    
     /* Restore text */
     if (pText) {
-        SetWindowText(pTab->hwndEdit, pText);
+        SetWindowTextW(pTab->hwndEdit, pText);
         HeapFree(GetProcessHeap(), 0, pText);
     }
     
-    /* Show/hide based on current tab */
+    /* Restore modified flag */
+    pTab->bModified = bWasModified;
+    
+    /* Reposition using RepositionControls for proper line number handling */
     if (nTabIndex == g_AppState.nCurrentTab) {
-        RECT rc;
-        GetClientRect(hwnd, &rc);
-        MoveWindow(pTab->hwndEdit, 0, TAB_HEIGHT, rc.right, rc.bottom - TAB_HEIGHT, TRUE);
+        RepositionControls(hwnd);
         ShowWindow(pTab->hwndEdit, SW_SHOW);
         SetFocus(pTab->hwndEdit);
     } else {
         ShowWindow(pTab->hwndEdit, SW_HIDE);
+    }
+    
+    /* Re-enable redraw */
+    SendMessage(hwnd, WM_SETREDRAW, TRUE, 0);
+    InvalidateRect(hwnd, NULL, TRUE);
+    
+    /* Restart periodic timer if line numbers are visible */
+    if (g_AppState.bShowLineNumbers) {
+        SetTimer(hwnd, 2, 100, NULL);
     }
 }
 

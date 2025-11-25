@@ -1,4 +1,4 @@
-# Makefile for Win32 Notepad Application
+# Makefile for XNote Application
 
 # Compiler and tools
 CC = gcc
@@ -8,11 +8,11 @@ RC = windres
 SRC_DIR = src
 
 # Output
-TARGET = notepad.exe
+TARGET = xnote.exe
 
-# Compiler flags for Win32
-CFLAGS = -Wall -Wextra -O2 -DUNICODE -D_UNICODE
-LDFLAGS = -mwindows -lcomctl32 -lcomdlg32
+# Compiler flags for Win32 (optimized)
+CFLAGS = -Wall -Wextra -O3 -DUNICODE -D_UNICODE
+LDFLAGS = -mwindows -lcomctl32 -lcomdlg32 -s
 
 # Resource compiler flags (fix for paths with spaces)
 RCFLAGS = "--preprocessor=gcc -E -xc -DRC_INVOKED"

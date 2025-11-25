@@ -48,10 +48,11 @@ void ShowAboutDialog(HWND hwnd) {
     TCHAR szMessage[512];
     _sntprintf(szMessage, 512, 
         TEXT("%s Version %s\n\n")
-        TEXT("A powerful text editor built with Win32 API.\n\n")
+        TEXT("A fast and lightweight text editor.\n\n")
         TEXT("Features:\n")
-        TEXT("  - Multiple tabs support\n")
-        TEXT("  - Large file support (up to 2GB)\n")
+        TEXT("  - Multiple tabs with close button\n")
+        TEXT("  - Line numbers\n")
+        TEXT("  - Large file support\n")
         TEXT("  - UTF-8 encoding\n")
         TEXT("  - Word wrap toggle\n\n")
         TEXT("Shortcuts:\n")
@@ -63,7 +64,7 @@ void ShowAboutDialog(HWND hwnd) {
     MessageBox(
         hwnd,
         szMessage,
-        TEXT("About"),
+        TEXT("About XNote"),
         MB_OK | MB_ICONINFORMATION
     );
 }

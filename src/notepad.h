@@ -8,8 +8,8 @@
 #include "resource.h"
 
 /* Application name */
-#define APP_NAME TEXT("Notepad")
-#define APP_VERSION TEXT("2.0")
+#define APP_NAME TEXT("XNote")
+#define APP_VERSION TEXT("1.0")
 
 /* Maximum number of tabs */
 #define MAX_TABS 32

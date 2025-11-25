@@ -93,7 +93,7 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
     switch (msg) {
         case WM_PAINT: {
             PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
+            HDC hdcScreen = BeginPaint(hwnd, &ps);
             
             /* Get associated edit control from parent's current tab */
             HWND hwndEdit = GetCurrentEdit();
@@ -105,14 +105,21 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             /* Get client rect */
             RECT rcClient;
             GetClientRect(hwnd, &rcClient);
+            int nWidth = rcClient.right - rcClient.left;
+            int nHeight = rcClient.bottom - rcClient.top;
+            
+            /* Create double buffer */
+            HDC hdc = CreateCompatibleDC(hdcScreen);
+            HBITMAP hBitmap = CreateCompatibleBitmap(hdcScreen, nWidth, nHeight);
+            HBITMAP hOldBitmap = (HBITMAP)SelectObject(hdc, hBitmap);
             
             /* Fill background with light gray */
-            HBRUSH hBrush = CreateSolidBrush(RGB(240, 240, 240));
+            HBRUSH hBrush = CreateSolidBrush(RGB(245, 245, 245));
             FillRect(hdc, &rcClient, hBrush);
             DeleteObject(hBrush);
             
             /* Draw separator line */
-            HPEN hPen = CreatePen(PS_SOLID, 1, RGB(200, 200, 200));
+            HPEN hPen = CreatePen(PS_SOLID, 1, RGB(220, 220, 220));
             HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
             MoveToEx(hdc, rcClient.right - 1, rcClient.top, NULL);
             LineTo(hdc, rcClient.right - 1, rcClient.bottom);
@@ -136,18 +143,18 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             int nTotalLines = GetEditLineCount(hwndEdit);
             
             /* Calculate visible lines */
-            int nVisibleLines = (rcClient.bottom - rcClient.top) / nLineHeight + 2;
+            int nVisibleLines = nHeight / nLineHeight + 2;
             
             /* Set text properties */
             SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, RGB(100, 100, 100));
+            SetTextColor(hdc, RGB(128, 128, 128));
             
             /* 
              * Calculate top offset to match edit control's text position
              * Edit control has WS_EX_CLIENTEDGE which adds a 2-pixel border
              * Plus internal padding of about 1 pixel
              */
-            int nTopOffset = 3;  /* Border (2) + internal padding (1) */
+            int nTopOffset = 3;
             
             /* Draw line numbers */
             TCHAR szLineNum[16];
@@ -166,6 +173,14 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             if (hOldFont) {
                 SelectObject(hdc, hOldFont);
             }
+            
+            /* Copy buffer to screen */
+            BitBlt(hdcScreen, 0, 0, nWidth, nHeight, hdc, 0, 0, SRCCOPY);
+            
+            /* Cleanup */
+            SelectObject(hdc, hOldBitmap);
+            DeleteObject(hBitmap);
+            DeleteDC(hdc);
             
             EndPaint(hwnd, &ps);
             return 0;
@@ -195,8 +210,8 @@ void SyncLineNumberScroll(HWND hwndLineNumbers, HWND hwndEdit) {
     (void)hwndEdit; /* Unused - we get edit from GetCurrentEdit() */
     if (!hwndLineNumbers || !IsWindowVisible(hwndLineNumbers)) return;
     
-    /* Just invalidate - the paint handler will get the current scroll position */
-    InvalidateRect(hwndLineNumbers, NULL, TRUE);
+    /* Invalidate without erasing background for smoother redraw */
+    InvalidateRect(hwndLineNumbers, NULL, FALSE);
 }
 
 /* Toggle line numbers visibility */
@@ -224,8 +239,8 @@ void ToggleLineNumbers(HWND hwnd) {
             
             ShowWindow(pTab->lineNumState.hwndLineNumbers, SW_SHOW);
             
-            /* Start periodic sync timer */
-            SetTimer(hwnd, 2, 50, NULL);
+            /* Start periodic sync timer - 100ms is enough for smooth sync */
+            SetTimer(hwnd, 2, 100, NULL);
         } else {
             pTab->lineNumState.bShowLineNumbers = FALSE;
             if (pTab->lineNumState.hwndLineNumbers) {
@@ -246,15 +261,48 @@ void ToggleLineNumbers(HWND hwnd) {
 
 /* Reposition controls based on line number visibility */
 void RepositionControls(HWND hwnd) {
+    if (!hwnd || !g_AppState.hwndTab) return;
+    
     RECT rc;
     GetClientRect(hwnd, &rc);
     
+    /* Minimum size check */
+    if (rc.right < 100 || rc.bottom < 100) return;
+    
     /* Tab control at top */
     int nTabHeight = TAB_HEIGHT;
-    MoveWindow(g_AppState.hwndTab, 0, 0, rc.right, nTabHeight, TRUE);
+    
+    /* Use DeferWindowPos for smoother resize */
+    HDWP hdwp = BeginDeferWindowPos(3);
+    if (!hdwp) {
+        /* Fallback to regular MoveWindow */
+        MoveWindow(g_AppState.hwndTab, 0, 0, rc.right, nTabHeight, FALSE);
+        
+        TabState* pTab = GetCurrentTabState();
+        if (pTab && pTab->hwndEdit) {
+            int nEditLeft = 0;
+            int nEditWidth = rc.right;
+            
+            if (g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                int nLineNumWidth = pTab->lineNumState.nLineNumberWidth;
+                if (nLineNumWidth <= 0) nLineNumWidth = DEFAULT_LINE_NUM_WIDTH;
+                MoveWindow(pTab->lineNumState.hwndLineNumbers, 0, nTabHeight, nLineNumWidth, rc.bottom - nTabHeight, FALSE);
+                nEditLeft = nLineNumWidth;
+                nEditWidth = rc.right - nLineNumWidth;
+            }
+            MoveWindow(pTab->hwndEdit, nEditLeft, nTabHeight, nEditWidth, rc.bottom - nTabHeight, FALSE);
+        }
+        InvalidateRect(hwnd, NULL, FALSE);
+        return;
+    }
+    
+    hdwp = DeferWindowPos(hdwp, g_AppState.hwndTab, NULL, 0, 0, rc.right, nTabHeight, SWP_NOZORDER | SWP_NOACTIVATE);
     
     TabState* pTab = GetCurrentTabState();
-    if (!pTab) return;
+    if (!pTab) {
+        EndDeferWindowPos(hdwp);
+        return;
+    }
     
     int nEditLeft = 0;
     int nEditWidth = rc.right;
@@ -264,10 +312,10 @@ void RepositionControls(HWND hwnd) {
         if (nLineNumWidth <= 0) nLineNumWidth = DEFAULT_LINE_NUM_WIDTH;
         
         /* Position line number window */
-        MoveWindow(pTab->lineNumState.hwndLineNumbers, 
+        hdwp = DeferWindowPos(hdwp, pTab->lineNumState.hwndLineNumbers, NULL,
                    0, nTabHeight, 
                    nLineNumWidth, rc.bottom - nTabHeight, 
-                   TRUE);
+                   SWP_NOZORDER | SWP_NOACTIVATE);
         
         nEditLeft = nLineNumWidth;
         nEditWidth = rc.right - nLineNumWidth;
@@ -275,11 +323,13 @@ void RepositionControls(HWND hwnd) {
     
     /* Position edit control */
     if (pTab->hwndEdit) {
-        MoveWindow(pTab->hwndEdit, 
+        hdwp = DeferWindowPos(hdwp, pTab->hwndEdit, NULL,
                    nEditLeft, nTabHeight, 
                    nEditWidth, rc.bottom - nTabHeight, 
-                   TRUE);
+                   SWP_NOZORDER | SWP_NOACTIVATE);
     }
+    
+    EndDeferWindowPos(hdwp);
     
     /* Refresh line numbers */
     if (pTab->lineNumState.hwndLineNumbers && g_AppState.bShowLineNumbers) {
