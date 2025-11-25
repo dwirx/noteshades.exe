@@ -228,7 +228,13 @@ void UpdateStatusBar(HWND hwnd) {
     
     /* Part 7: Vim mode */
     if (IsVimModeEnabled()) {
-        SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_VIMMODE, (LPARAM)GetVimModeString());
+        VimModeState vimMode = GetVimModeState();
+        if (vimMode == VIM_MODE_COMMAND || vimMode == VIM_MODE_SEARCH) {
+            /* Show command buffer */
+            SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_VIMMODE, (LPARAM)GetVimCommandBuffer());
+        } else {
+            SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_VIMMODE, (LPARAM)GetVimModeString());
+        }
     } else {
         SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_VIMMODE, (LPARAM)TEXT(""));
     }

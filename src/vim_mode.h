@@ -10,7 +10,8 @@ typedef enum {
     VIM_MODE_INSERT,        /* Insert mode - typing */
     VIM_MODE_VISUAL,        /* Visual mode - character selection */
     VIM_MODE_VISUAL_LINE,   /* Visual Line mode - line selection (V) */
-    VIM_MODE_COMMAND        /* Command mode - : commands */
+    VIM_MODE_COMMAND,       /* Command mode - : commands */
+    VIM_MODE_SEARCH         /* Search mode - / or ? */
 } VimModeState;
 
 /* Vim state structure */
@@ -22,11 +23,15 @@ typedef struct {
     DWORD dwVisualStart;        /* Visual mode selection start */
     int nVisualStartLine;       /* Visual line mode start line */
     int nVisualCurrentLine;     /* Visual line mode current line */
-    TCHAR szCommandBuffer[64];  /* Command buffer for : commands */
+    TCHAR szCommandBuffer[256]; /* Command buffer for : commands */
     int nCommandLen;            /* Command buffer length */
     TCHAR szSearchPattern[256]; /* Last search pattern */
     BOOL bSearchForward;        /* Search direction */
     int nDesiredCol;            /* Desired column for vertical movement */
+    HWND hwndMain;              /* Main window handle for commands */
+    TCHAR szLastCommand[256];   /* Last executed command */
+    TCHAR szRegister[4096];     /* Yank register */
+    BOOL bRegisterIsLine;       /* Is register content a full line? */
 } VimState;
 
 /* Global vim state */
@@ -99,5 +104,23 @@ void VimSearchForward(HWND hwndEdit, const TCHAR* pattern);
 void VimSearchBackward(HWND hwndEdit, const TCHAR* pattern);
 void VimSearchNext(HWND hwndEdit);
 void VimSearchPrev(HWND hwndEdit);
+void VimSearchRealtime(HWND hwndEdit);
+
+/* Command mode */
+void VimEnterCommandMode(HWND hwndEdit);
+void VimEnterSearchMode(HWND hwndEdit, BOOL bForward);
+void VimExecuteCommand(HWND hwndMain, HWND hwndEdit);
+const TCHAR* GetVimCommandBuffer(void);
+
+/* Find character on line */
+void VimFindCharForward(HWND hwndEdit, TCHAR ch, int count);
+void VimFindCharBackward(HWND hwndEdit, TCHAR ch, int count);
+void VimFindCharTillForward(HWND hwndEdit, TCHAR ch, int count);
+void VimFindCharTillBackward(HWND hwndEdit, TCHAR ch, int count);
+
+/* Additional motions */
+void VimMoveMatchingBracket(HWND hwndEdit);
+void VimMoveParagraphForward(HWND hwndEdit, int count);
+void VimMoveParagraphBackward(HWND hwndEdit, int count);
 
 #endif /* VIM_MODE_H */

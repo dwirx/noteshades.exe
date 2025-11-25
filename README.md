@@ -29,6 +29,8 @@ A fast, lightweight text editor built with Win32 API featuring syntax highlighti
 |----------|--------|
 | Ctrl+Tab | Next tab |
 | Ctrl+Shift+Tab | Previous tab |
+| Ctrl+PageDown | Next tab |
+| Ctrl+PageUp | Previous tab |
 | Ctrl+1-9 | Go to tab 1-9 |
 
 ### Edit Operations
@@ -68,7 +70,55 @@ A fast, lightweight text editor built with Win32 API featuring syntax highlighti
 
 ## Vim Mode
 
-Enable via **View → Vim Mode**. Status bar shows current mode (NORMAL/INSERT/VISUAL/V-LINE).
+Enable via **View → Vim Mode** or `Ctrl+Shift+V`. Status bar shows current mode.
+
+### Command Mode (`:`)
+| Command | Action |
+|---------|--------|
+| `:w` | Save file |
+| `:q` | Close tab (fails if unsaved) |
+| `:q!` | Force close without saving |
+| `:wq` or `:x` | Save and close |
+| `:qa` | Close all tabs |
+| `:qa!` | Force close all |
+| `:e` | Open file |
+| `:new` | New tab |
+| `:tabnew` | New tab |
+| `:tabn` | Next tab |
+| `:tabp` | Previous tab |
+| `:{n}` | Go to line n |
+| `:set nu` | Show line numbers |
+| `:set nonu` | Hide line numbers |
+| `:set rnu` | Relative line numbers |
+| `:set wrap` | Enable word wrap |
+| `:set nowrap` | Disable word wrap |
+
+### Search Mode (`/` and `?`)
+| Key | Action |
+|-----|--------|
+| `/pattern` | Search forward (realtime preview) |
+| `?pattern` | Search backward (realtime preview) |
+| `n` | Next match |
+| `N` | Previous match |
+| `*` | Search word under cursor forward |
+| `#` | Search word under cursor backward |
+| `Esc` | Cancel search, return to original position |
+| `Enter` | Confirm search, stay at found position |
+
+Search features:
+- Realtime preview - results highlight as you type
+- Case-insensitive by default
+- Press `Esc` to cancel and return to original position
+- Press `Enter` to confirm, then use `n`/`N` to navigate
+
+### Tab Navigation (Vim)
+| Key | Action |
+|-----|--------|
+| `gt` | Next tab |
+| `gT` | Previous tab |
+| `{n}gt` | Go to tab n |
+| `g0` | First tab |
+| `g$` | Last tab |
 
 ### Normal Mode - Navigation
 | Key | Action |
@@ -86,9 +136,26 @@ Enable via **View → Vim Mode**. Status bar shows current mode (NORMAL/INSERT/V
 | gg | First line |
 | G | Last line |
 | {n}G | Go to line n |
+| H | Top of screen |
+| M | Middle of screen |
+| L | Bottom of screen |
+| f{char} | Find char forward on line |
+| F{char} | Find char backward on line |
+| t{char} | Till char forward |
+| T{char} | Till char backward |
+| % | Matching bracket |
+| { | Previous paragraph |
+| } | Next paragraph |
 | Ctrl+D | Half page down |
 | Ctrl+U | Half page up |
 | Page Up/Down | Scroll page |
+
+### Scroll View
+| Key | Action |
+|-----|--------|
+| zz | Center current line |
+| zt | Scroll current line to top |
+| zb | Scroll current line to bottom |
 
 ### Normal Mode - Editing
 | Key | Action |
@@ -127,6 +194,9 @@ Enable via **View → Vim Mode**. Status bar shows current mode (NORMAL/INSERT/V
 | O | New line above |
 | v | Visual mode (character) |
 | V | Visual Line mode |
+| : | Command mode |
+| / | Search forward |
+| ? | Search backward |
 | Esc | Return to Normal mode |
 
 ### Visual Mode (v)

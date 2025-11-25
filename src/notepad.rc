@@ -127,6 +127,8 @@ BEGIN
     /* Tab navigation */
     VK_TAB, IDM_TAB_NEXT,       VIRTKEY, CONTROL
     VK_TAB, IDM_TAB_PREV,       VIRTKEY, CONTROL, SHIFT
+    VK_PRIOR, IDM_TAB_PREV,     VIRTKEY, CONTROL  /* Ctrl+PageUp */
+    VK_NEXT, IDM_TAB_NEXT,      VIRTKEY, CONTROL  /* Ctrl+PageDown */
     "1",    IDM_TAB_1,          VIRTKEY, CONTROL
     "2",    IDM_TAB_2,          VIRTKEY, CONTROL
     "3",    IDM_TAB_3,          VIRTKEY, CONTROL
