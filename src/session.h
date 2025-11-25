@@ -23,6 +23,14 @@ typedef struct {
     LanguageType language;       /* Syntax highlighting language */
 } SessionTab;
 
+/* Font settings structure */
+typedef struct {
+    TCHAR szFontName[LF_FACESIZE];  /* Font face name */
+    int nFontSize;                   /* Font size in points */
+    BOOL bBold;                      /* Bold style */
+    BOOL bItalic;                    /* Italic style */
+} FontSettings;
+
 /* Session data structure */
 typedef struct {
     int nVersion;                /* Session format version */
@@ -33,11 +41,13 @@ typedef struct {
     BOOL bRelativeLineNumbers;   /* Relative line numbers enabled */
     BOOL bVimMode;               /* Vim mode enabled */
     BOOL bSyntaxHighlight;       /* Syntax highlighting enabled */
+    int nTheme;                  /* Theme index */
     int nWindowX;                /* Window X position */
     int nWindowY;                /* Window Y position */
     int nWindowWidth;            /* Window width */
     int nWindowHeight;           /* Window height */
     BOOL bMaximized;             /* Window maximized state */
+    FontSettings font;           /* Font settings */
     SessionTab tabs[MAX_TABS];   /* Tab data array */
 } SessionData;
 
@@ -57,5 +67,15 @@ void MarkSessionDirty(void);
 void InitSessionSystem(HWND hwnd);
 void CleanupSessionSystem(void);
 void HandleSessionTimer(HWND hwnd);
+
+/* Font functions */
+void ShowFontDialog(HWND hwnd);
+void ApplyFont(HWND hwnd, const TCHAR* szFontName, int nSize, BOOL bBold, BOOL bItalic);
+void GetCurrentFont(FontSettings* pFont);
+void SetCurrentFont(const FontSettings* pFont);
+HFONT GetCurrentFontHandle(void);
+
+/* Global font settings */
+extern FontSettings g_FontSettings;
 
 #endif /* SESSION_H */

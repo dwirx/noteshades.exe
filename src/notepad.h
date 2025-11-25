@@ -186,4 +186,8 @@ int CountWords(HWND hwndEdit);
 /* Vim mode operations */
 #include "vim_mode.h"
 
+/* Font operations */
+void SetGlobalFont(HFONT hFont);
+HFONT GetGlobalFont(void);
+
 #endif /* NOTEPAD_H */

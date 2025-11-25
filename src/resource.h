@@ -26,6 +26,7 @@
 
 /* Format menu command IDs */
 #define IDM_FORMAT_WORDWRAP 251
+#define IDM_FORMAT_FONT     252
 
 /* View menu command IDs */
 #define IDM_VIEW_LINENUMBERS 261
@@ -103,6 +104,18 @@
 #define IDM_VIEW_ZOOMOUT    266
 #define IDM_VIEW_ZOOMRESET  267
 #define IDM_VIEW_FULLSCREEN 268
+
+/* Theme menu command IDs */
+#define IDM_THEME_LIGHT         270
+#define IDM_THEME_DARK          271
+#define IDM_THEME_TOKYO_NIGHT   272
+#define IDM_THEME_TOKYO_STORM   273
+#define IDM_THEME_TOKYO_LIGHT   274
+#define IDM_THEME_MONOKAI       275
+#define IDM_THEME_DRACULA       276
+#define IDM_THEME_ONE_DARK      277
+#define IDM_THEME_NORD          278
+#define IDM_THEME_GRUVBOX       279
 
 /* Find/Replace dialog IDs */
 #define IDD_FINDREPLACE     500

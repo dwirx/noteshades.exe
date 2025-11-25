@@ -7,6 +7,7 @@
 #include "notepad.h"
 #include "vim_mode.h"
 #include "syntax.h"
+#include "theme.h"
 #include <shlobj.h>
 #include <stdio.h>
 
@@ -14,7 +15,18 @@
 static BOOL g_bSessionDirty = FALSE;
 
 /* Current session version */
-#define SESSION_VERSION 1
+#define SESSION_VERSION 2
+
+/* Global font settings with defaults */
+FontSettings g_FontSettings = {
+    TEXT("Consolas"),  /* Default font - excellent for coding */
+    11,                /* Default size */
+    FALSE,             /* Not bold */
+    FALSE              /* Not italic */
+};
+
+/* Global font handle */
+static HFONT g_hCurrentFont = NULL;
 
 /* Get session file path in AppData folder */
 BOOL GetSessionFilePath(TCHAR* szPath, DWORD dwSize) {
@@ -84,12 +96,23 @@ static BOOL WriteJsonToFile(const TCHAR* szPath, SessionData* pSession) {
     fprintf(fp, "  \"relativeLineNumbers\": %s,\n", pSession->bRelativeLineNumbers ? "true" : "false");
     fprintf(fp, "  \"vimMode\": %s,\n", pSession->bVimMode ? "true" : "false");
     fprintf(fp, "  \"syntaxHighlight\": %s,\n", pSession->bSyntaxHighlight ? "true" : "false");
+    fprintf(fp, "  \"theme\": %d,\n", pSession->nTheme);
     fprintf(fp, "  \"window\": {\n");
     fprintf(fp, "    \"x\": %d,\n", pSession->nWindowX);
     fprintf(fp, "    \"y\": %d,\n", pSession->nWindowY);
     fprintf(fp, "    \"width\": %d,\n", pSession->nWindowWidth);
     fprintf(fp, "    \"height\": %d,\n", pSession->nWindowHeight);
     fprintf(fp, "    \"maximized\": %s\n", pSession->bMaximized ? "true" : "false");
+    fprintf(fp, "  },\n");
+    
+    /* Write font settings */
+    char escapedFontName[LF_FACESIZE * 2];
+    EscapeJsonString(pSession->font.szFontName, escapedFontName, sizeof(escapedFontName));
+    fprintf(fp, "  \"font\": {\n");
+    fprintf(fp, "    \"name\": \"%s\",\n", escapedFontName);
+    fprintf(fp, "    \"size\": %d,\n", pSession->font.nFontSize);
+    fprintf(fp, "    \"bold\": %s,\n", pSession->font.bBold ? "true" : "false");
+    fprintf(fp, "    \"italic\": %s\n", pSession->font.bItalic ? "true" : "false");
     fprintf(fp, "  },\n");
     
     /* Write tabs array */
@@ -259,6 +282,17 @@ static BOOL ReadJsonFromFile(const TCHAR* szPath, SessionData* pSession) {
         pSession->bSyntaxHighlight = ParseBool(p);
     }
     
+    /* Parse theme */
+    p = pBuffer;
+    p = strstr(p, "\"theme\"");
+    if (p) {
+        p = FindChar(p, ':');
+        p = SkipWhitespace(p + 1);
+        pSession->nTheme = ParseInt(p);
+    } else {
+        pSession->nTheme = THEME_TOKYO_NIGHT;  /* Default theme */
+    }
+    
     /* Parse window settings */
     p = pBuffer;
     p = strstr(p, "\"window\"");
@@ -300,6 +334,61 @@ static BOOL ReadJsonFromFile(const TCHAR* szPath, SessionData* pSession) {
             temp = SkipWhitespace(temp + 1);
             pSession->bMaximized = ParseBool(temp);
         }
+    }
+    
+    /* Parse font settings */
+    p = pBuffer;
+    p = strstr(p, "\"font\"");
+    if (p) {
+        char* fontEnd = p;
+        int braceCount = 0;
+        while (*fontEnd) {
+            if (*fontEnd == '{') braceCount++;
+            if (*fontEnd == '}') {
+                braceCount--;
+                if (braceCount == 0) break;
+            }
+            fontEnd++;
+        }
+        
+        char* temp;
+        
+        temp = strstr(p, "\"name\"");
+        if (temp && temp < fontEnd) {
+            temp = FindChar(temp, ':');
+            temp = SkipWhitespace(temp + 1);
+            if (*temp == '"') {
+                temp++;
+                ParseJsonString(temp, pSession->font.szFontName, LF_FACESIZE);
+            }
+        }
+        
+        temp = strstr(p, "\"size\"");
+        if (temp && temp < fontEnd) {
+            temp = FindChar(temp, ':');
+            temp = SkipWhitespace(temp + 1);
+            pSession->font.nFontSize = ParseInt(temp);
+        }
+        
+        temp = strstr(p, "\"bold\"");
+        if (temp && temp < fontEnd) {
+            temp = FindChar(temp, ':');
+            temp = SkipWhitespace(temp + 1);
+            pSession->font.bBold = ParseBool(temp);
+        }
+        
+        temp = strstr(p, "\"italic\"");
+        if (temp && temp < fontEnd) {
+            temp = FindChar(temp, ':');
+            temp = SkipWhitespace(temp + 1);
+            pSession->font.bItalic = ParseBool(temp);
+        }
+    } else {
+        /* Default font settings if not found */
+        _tcscpy(pSession->font.szFontName, TEXT("Consolas"));
+        pSession->font.nFontSize = 11;
+        pSession->font.bBold = FALSE;
+        pSession->font.bItalic = FALSE;
     }
     
     /* Parse tabs array */
@@ -409,6 +498,7 @@ BOOL SaveSession(HWND hwnd) {
     session.bRelativeLineNumbers = g_AppState.bRelativeLineNumbers;
     session.bVimMode = IsVimModeEnabled();
     session.bSyntaxHighlight = g_bSyntaxHighlight;
+    session.nTheme = (int)GetCurrentTheme();
     
     /* Get window position and size */
     wp.length = sizeof(WINDOWPLACEMENT);
@@ -419,6 +509,9 @@ BOOL SaveSession(HWND hwnd) {
     session.nWindowY = wp.rcNormalPosition.top;
     session.nWindowWidth = wp.rcNormalPosition.right - wp.rcNormalPosition.left;
     session.nWindowHeight = wp.rcNormalPosition.bottom - wp.rcNormalPosition.top;
+    
+    /* Save font settings */
+    session.font = g_FontSettings;
     
     /* Save each tab's state */
     for (int i = 0; i < g_AppState.nTabCount && i < MAX_TABS; i++) {
@@ -506,6 +599,16 @@ BOOL LoadSession(HWND hwnd) {
     /* Apply syntax highlighting setting */
     g_bSyntaxHighlight = session.bSyntaxHighlight;
     
+    /* Apply theme setting */
+    if (session.nTheme >= 0 && session.nTheme < GetThemeCount()) {
+        SetTheme((ThemeType)session.nTheme);
+    }
+    
+    /* Apply font settings */
+    if (session.font.szFontName[0] != '\0' && session.font.nFontSize > 0) {
+        g_FontSettings = session.font;
+    }
+    
     /* Update menu check marks */
     HMENU hMenu = GetMenu(hwnd);
     CheckMenuItem(hMenu, IDM_FORMAT_WORDWRAP, session.bWordWrap ? MF_CHECKED : MF_UNCHECKED);
@@ -585,6 +688,19 @@ BOOL LoadSession(HWND hwnd) {
         SwitchToTab(hwnd, 0);
     }
     
+    /* Apply font to all loaded tabs */
+    HFONT hFont = GetCurrentFontHandle();
+    if (hFont) {
+        for (int i = 0; i < g_AppState.nTabCount; i++) {
+            if (g_AppState.tabs[i].hwndEdit) {
+                SendMessage(g_AppState.tabs[i].hwndEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
+            }
+        }
+        if (g_AppState.hwndTab) {
+            SendMessage(g_AppState.hwndTab, WM_SETFONT, (WPARAM)hFont, TRUE);
+        }
+    }
+    
     UpdateWindowTitle(hwnd);
     return TRUE;
 }
@@ -613,7 +729,11 @@ void InitSessionSystem(HWND hwnd) {
 
 /* Cleanup session system */
 void CleanupSessionSystem(void) {
-    /* Nothing to cleanup currently */
+    /* Cleanup font */
+    if (g_hCurrentFont) {
+        DeleteObject(g_hCurrentFont);
+        g_hCurrentFont = NULL;
+    }
 }
 
 /* Handle auto-save timer */
@@ -621,4 +741,129 @@ void HandleSessionTimer(HWND hwnd) {
     if (g_bSessionDirty) {
         SaveSession(hwnd);
     }
+}
+
+/* Create font from settings */
+static HFONT CreateFontFromSettings(const FontSettings* pFont) {
+    HDC hdc = GetDC(NULL);
+    int nHeight = -MulDiv(pFont->nFontSize, GetDeviceCaps(hdc, LOGPIXELSY), 72);
+    ReleaseDC(NULL, hdc);
+    
+    return CreateFont(
+        nHeight,                    /* Height */
+        0,                          /* Width */
+        0,                          /* Escapement */
+        0,                          /* Orientation */
+        pFont->bBold ? FW_BOLD : FW_NORMAL,  /* Weight */
+        pFont->bItalic,             /* Italic */
+        FALSE,                      /* Underline */
+        FALSE,                      /* StrikeOut */
+        DEFAULT_CHARSET,            /* CharSet */
+        OUT_DEFAULT_PRECIS,         /* OutPrecision */
+        CLIP_DEFAULT_PRECIS,        /* ClipPrecision */
+        CLEARTYPE_QUALITY,          /* Quality - use ClearType for best rendering */
+        FIXED_PITCH | FF_MODERN,    /* PitchAndFamily */
+        pFont->szFontName           /* FaceName */
+    );
+}
+
+/* Apply font to all edit controls */
+void ApplyFont(HWND hwnd, const TCHAR* szFontName, int nSize, BOOL bBold, BOOL bItalic) {
+    (void)hwnd;  /* Reserved for future use */
+    
+    /* Update global settings */
+    _tcscpy(g_FontSettings.szFontName, szFontName);
+    g_FontSettings.nFontSize = nSize;
+    g_FontSettings.bBold = bBold;
+    g_FontSettings.bItalic = bItalic;
+    
+    /* Create new font */
+    HFONT hNewFont = CreateFontFromSettings(&g_FontSettings);
+    
+    if (!hNewFont) return;
+    
+    /* Update global font handle (this will delete old font) */
+    SetGlobalFont(hNewFont);
+    g_hCurrentFont = hNewFont;
+    
+    /* Apply to all edit controls */
+    for (int i = 0; i < g_AppState.nTabCount; i++) {
+        if (g_AppState.tabs[i].hwndEdit) {
+            SendMessage(g_AppState.tabs[i].hwndEdit, WM_SETFONT, (WPARAM)hNewFont, TRUE);
+        }
+    }
+    
+    /* Apply to tab control */
+    if (g_AppState.hwndTab) {
+        SendMessage(g_AppState.hwndTab, WM_SETFONT, (WPARAM)hNewFont, TRUE);
+    }
+    
+    /* Refresh line numbers */
+    TabState* pTab = GetCurrentTabState();
+    if (pTab && pTab->lineNumState.hwndLineNumbers) {
+        InvalidateRect(pTab->lineNumState.hwndLineNumbers, NULL, TRUE);
+    }
+    
+    /* Mark session dirty */
+    MarkSessionDirty();
+}
+
+/* Show font selection dialog */
+void ShowFontDialog(HWND hwnd) {
+    CHOOSEFONT cf;
+    LOGFONT lf;
+    
+    ZeroMemory(&cf, sizeof(cf));
+    ZeroMemory(&lf, sizeof(lf));
+    
+    /* Initialize with current font settings */
+    HDC hdc = GetDC(hwnd);
+    lf.lfHeight = -MulDiv(g_FontSettings.nFontSize, GetDeviceCaps(hdc, LOGPIXELSY), 72);
+    ReleaseDC(hwnd, hdc);
+    
+    lf.lfWeight = g_FontSettings.bBold ? FW_BOLD : FW_NORMAL;
+    lf.lfItalic = g_FontSettings.bItalic;
+    lf.lfCharSet = DEFAULT_CHARSET;
+    lf.lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
+    _tcscpy(lf.lfFaceName, g_FontSettings.szFontName);
+    
+    cf.lStructSize = sizeof(cf);
+    cf.hwndOwner = hwnd;
+    cf.lpLogFont = &lf;
+    cf.Flags = CF_SCREENFONTS | CF_FIXEDPITCHONLY | CF_INITTOLOGFONTSTRUCT | CF_EFFECTS;
+    cf.nFontType = SCREEN_FONTTYPE;
+    
+    if (ChooseFont(&cf)) {
+        /* Calculate point size from height */
+        hdc = GetDC(hwnd);
+        int nPointSize = MulDiv(-lf.lfHeight, 72, GetDeviceCaps(hdc, LOGPIXELSY));
+        ReleaseDC(hwnd, hdc);
+        
+        /* Apply the selected font */
+        ApplyFont(hwnd, lf.lfFaceName, nPointSize, 
+                  lf.lfWeight >= FW_BOLD, lf.lfItalic);
+    }
+}
+
+/* Get current font settings */
+void GetCurrentFont(FontSettings* pFont) {
+    if (pFont) {
+        *pFont = g_FontSettings;
+    }
+}
+
+/* Set current font settings */
+void SetCurrentFont(const FontSettings* pFont) {
+    if (pFont) {
+        g_FontSettings = *pFont;
+    }
+}
+
+/* Get font handle for external use */
+HFONT GetCurrentFontHandle(void) {
+    if (!g_hCurrentFont) {
+        g_hCurrentFont = CreateFontFromSettings(&g_FontSettings);
+        SetGlobalFont(g_hCurrentFont);
+    }
+    return g_hCurrentFont;
 }

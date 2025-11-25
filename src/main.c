@@ -2,6 +2,7 @@
 #include "syntax.h"
 #include "vim_mode.h"
 #include "session.h"
+#include "theme.h"
 #include <richedit.h>
 
 /* Global application state */
@@ -12,6 +13,19 @@ static const TCHAR szClassName[] = TEXT("NotepadMainWindow");
 
 /* Font handle for edit control */
 static HFONT g_hFont = NULL;
+
+/* Set global font handle */
+void SetGlobalFont(HFONT hFont) {
+    if (g_hFont && g_hFont != hFont) {
+        DeleteObject(g_hFont);
+    }
+    g_hFont = hFont;
+}
+
+/* Get global font handle */
+HFONT GetGlobalFont(void) {
+    return g_hFont;
+}
 
 /* RichEdit library handle */
 static HMODULE g_hRichEdit = NULL;
@@ -286,6 +300,9 @@ static HWND CreateTabEditControl(HWND hwndParent, BOOL bWordWrap) {
         /* Set text limit to maximum */
         SendMessage(hwndEdit, EM_SETLIMITTEXT, 0, 0);
         
+        /* Apply current theme colors */
+        ApplyThemeToEdit(hwndEdit);
+        
         /* Subclass edit control to catch scroll events */
         g_OrigEditProc = (WNDPROC)SetWindowLongPtr(hwndEdit, GWLP_WNDPROC, (LONG_PTR)EditSubclassProc);
     }
@@ -513,12 +530,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             g_AppState.nTabCount = 0;
             g_AppState.nCurrentTab = -1;
             
-            /* Create font for edit controls */
-            g_hFont = CreateFont(
-                16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                DEFAULT_QUALITY, FIXED_PITCH | FF_MODERN, TEXT("Consolas")
-            );
+            /* Create font for edit controls - will be updated after session load */
+            g_hFont = GetCurrentFontHandle();
             
             /* Create status bar */
             g_AppState.hwndStatus = CreateStatusBar(hwnd, g_AppState.hInstance);
@@ -543,10 +556,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             /* Set tab item size for close button */
             TabCtrl_SetItemSize(g_AppState.hwndTab, 120, TAB_HEIGHT - 4);
             
+            /* Initialize theme system */
+            InitTheme();
+            
             /* Try to load previous session, otherwise create first tab */
             if (!LoadSession(hwnd)) {
                 AddNewTab(hwnd, TEXT("Untitled"));
             }
+            
+            /* Apply theme to all controls */
+            ApplyThemeToWindow(hwnd);
             
             /* Initialize menu check marks */
             HMENU hMenu = GetMenu(hwnd);
@@ -811,6 +830,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     ToggleWordWrap(hwnd);
                     break;
                 
+                case IDM_FORMAT_FONT:
+                    ShowFontDialog(hwnd);
+                    break;
+                
                 /* View menu */
                 case IDM_VIEW_LINENUMBERS:
                     ToggleLineNumbers(hwnd);
@@ -843,6 +866,48 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 
                 case IDM_VIEW_VIMMODE:
                     ToggleVimMode(hwnd);
+                    break;
+                
+                /* Theme selection */
+                case IDM_THEME_LIGHT:
+                    SetTheme(THEME_LIGHT);
+                    ApplyThemeToWindow(hwnd);
+                    break;
+                case IDM_THEME_DARK:
+                    SetTheme(THEME_DARK);
+                    ApplyThemeToWindow(hwnd);
+                    break;
+                case IDM_THEME_TOKYO_NIGHT:
+                    SetTheme(THEME_TOKYO_NIGHT);
+                    ApplyThemeToWindow(hwnd);
+                    break;
+                case IDM_THEME_TOKYO_STORM:
+                    SetTheme(THEME_TOKYO_NIGHT_STORM);
+                    ApplyThemeToWindow(hwnd);
+                    break;
+                case IDM_THEME_TOKYO_LIGHT:
+                    SetTheme(THEME_TOKYO_NIGHT_LIGHT);
+                    ApplyThemeToWindow(hwnd);
+                    break;
+                case IDM_THEME_MONOKAI:
+                    SetTheme(THEME_MONOKAI);
+                    ApplyThemeToWindow(hwnd);
+                    break;
+                case IDM_THEME_DRACULA:
+                    SetTheme(THEME_DRACULA);
+                    ApplyThemeToWindow(hwnd);
+                    break;
+                case IDM_THEME_ONE_DARK:
+                    SetTheme(THEME_ONE_DARK);
+                    ApplyThemeToWindow(hwnd);
+                    break;
+                case IDM_THEME_NORD:
+                    SetTheme(THEME_NORD);
+                    ApplyThemeToWindow(hwnd);
+                    break;
+                case IDM_THEME_GRUVBOX:
+                    SetTheme(THEME_GRUVBOX_DARK);
+                    ApplyThemeToWindow(hwnd);
                     break;
                 
                 /* Zoom controls */

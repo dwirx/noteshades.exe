@@ -1,5 +1,6 @@
 #include "notepad.h"
 #include "session.h"
+#include "theme.h"
 
 /* Line number window class name */
 static const TCHAR szLineNumClassName[] = TEXT("LineNumberWindow");
@@ -117,13 +118,15 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             HBITMAP hBitmap = CreateCompatibleBitmap(hdcScreen, nWidth, nHeight);
             HBITMAP hOldBitmap = (HBITMAP)SelectObject(hdc, hBitmap);
             
-            /* Fill background with light gray */
-            HBRUSH hBrush = CreateSolidBrush(RGB(240, 240, 240));
+            /* Fill background with theme color */
+            const ThemeColors* pTheme = GetThemeColors();
+            HBRUSH hBrush = CreateSolidBrush(pTheme->crLineNumBg);
             FillRect(hdc, &rcClient, hBrush);
             DeleteObject(hBrush);
             
             /* Draw thin separator line on right edge */
-            HPEN hPen = CreatePen(PS_SOLID, 1, RGB(200, 200, 200));
+            COLORREF crSeparator = pTheme->crLineNumber;
+            HPEN hPen = CreatePen(PS_SOLID, 1, crSeparator);
             HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
             MoveToEx(hdc, rcClient.right - 1, rcClient.top, NULL);
             LineTo(hdc, rcClient.right - 1, rcClient.bottom);
@@ -151,9 +154,9 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             /* Calculate how many lines can fit in visible area */
             int nVisibleLines = (nHeight / nLineHeight) + 2;
             
-            /* Set text properties - dark gray */
+            /* Set text properties using theme color */
             SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, RGB(100, 100, 100));
+            SetTextColor(hdc, pTheme->crLineNumber);
             
             /* Get current line for relative numbering */
             DWORD dwCursorPos = 0, dwCursorEnd = 0;
