@@ -40,4 +40,26 @@
 /* Accelerator table ID */
 #define IDR_ACCEL           1001
 
+/* Status bar part indices */
+#define SB_PART_FILETYPE    0
+#define SB_PART_LENGTH      1
+#define SB_PART_LINES       2
+#define SB_PART_POSITION    3
+#define SB_PART_LINEENDING  4
+#define SB_PART_ENCODING    5
+#define SB_PART_INSERTMODE  6
+#define SB_PART_COUNT       7
+
+/* Status bar widths */
+#define SB_WIDTH_FILETYPE   120
+#define SB_WIDTH_LENGTH     100
+#define SB_WIDTH_LINES      80
+#define SB_WIDTH_POSITION   180
+#define SB_WIDTH_LINEENDING 100
+#define SB_WIDTH_ENCODING   70
+#define SB_WIDTH_INSERTMODE 50
+
+/* Timer IDs */
+#define TIMER_STATUSBAR     4
+
 #endif /* RESOURCE_H */

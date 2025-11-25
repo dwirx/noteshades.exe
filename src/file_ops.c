@@ -33,6 +33,34 @@ static BOOL HasUtf8Bom(const char* pBuffer, DWORD dwSize) {
     return FALSE;
 }
 
+/* Detect line ending type from buffer */
+static LineEndingType DetectLineEnding(const char* pBuffer, DWORD dwSize) {
+    BOOL bHasCR = FALSE;
+    BOOL bHasLF = FALSE;
+    BOOL bHasCRLF = FALSE;
+    
+    for (DWORD i = 0; i < dwSize; i++) {
+        if (pBuffer[i] == '\r') {
+            if (i + 1 < dwSize && pBuffer[i + 1] == '\n') {
+                bHasCRLF = TRUE;
+                i++; /* Skip the LF */
+            } else {
+                bHasCR = TRUE;
+            }
+        } else if (pBuffer[i] == '\n') {
+            bHasLF = TRUE;
+        }
+    }
+    
+    /* Prioritize: CRLF > LF > CR */
+    if (bHasCRLF) return LINE_ENDING_CRLF;
+    if (bHasLF) return LINE_ENDING_LF;
+    if (bHasCR) return LINE_ENDING_CR;
+    
+    /* Default to Windows line ending */
+    return LINE_ENDING_CRLF;
+}
+
 /* Read file content into edit control - simple and reliable method */
 BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
     HANDLE hFile;
@@ -81,6 +109,12 @@ BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
     
     pBuffer[dwBytesRead] = '\0';
     CloseHandle(hFile);
+    
+    /* Detect line ending type and store in tab state */
+    TabState* pTab = GetCurrentTabState();
+    if (pTab) {
+        pTab->lineEnding = DetectLineEnding(pBuffer, dwBytesRead);
+    }
     
     /* Check for UTF-8 BOM and skip it */
     if (HasUtf8Bom(pBuffer, dwBytesRead)) {

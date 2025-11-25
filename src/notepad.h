@@ -21,6 +21,13 @@ typedef struct {
     int nLineNumberWidth;        /* Width of line number panel (in pixels) */
 } LineNumberState;
 
+/* Line ending types */
+typedef enum {
+    LINE_ENDING_CRLF = 0,        /* Windows (CR LF) */
+    LINE_ENDING_LF,              /* Unix (LF) */
+    LINE_ENDING_CR               /* Mac (CR) */
+} LineEndingType;
+
 /* Tab/Document state structure */
 typedef struct {
     TCHAR szFileName[MAX_PATH];  /* Full path of current file */
@@ -30,6 +37,8 @@ typedef struct {
     WCHAR* pContent;             /* Content buffer for large files */
     DWORD dwContentSize;         /* Size of content */
     LineNumberState lineNumState; /* Line number state for this tab */
+    LineEndingType lineEnding;   /* Line ending type */
+    BOOL bInsertMode;            /* Insert/Overwrite mode */
 } TabState;
 
 /* Application state structure */
@@ -103,5 +112,12 @@ void SyncLineNumberScroll(HWND hwndLineNumbers, HWND hwndEdit);
 int CalculateLineNumberWidth(int nLineCount);
 LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 void RepositionControls(HWND hwnd);
+
+/* Status bar operations */
+HWND CreateStatusBar(HWND hwndParent, HINSTANCE hInstance);
+void UpdateStatusBar(HWND hwnd);
+void SetStatusBarParts(HWND hwndStatus, int nWidth);
+const TCHAR* GetFileTypeString(const TCHAR* szFileName);
+int CountWords(HWND hwndEdit);
 
 #endif /* NOTEPAD_H */

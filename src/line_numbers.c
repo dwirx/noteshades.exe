@@ -49,8 +49,8 @@ int CalculateLineNumberWidth(int nLineCount) {
     /* Minimum 2 digits width */
     if (nDigits < 2) nDigits = 2;
     
-    /* Character width ~8 pixels for Consolas 16pt, plus small padding */
-    return (nDigits * 8) + LINE_NUM_PADDING + 10;
+    /* Character width ~8 pixels for Consolas 16pt, plus padding for right margin */
+    return (nDigits * 8) + 16;
 }
 
 
@@ -88,6 +88,59 @@ HWND CreateLineNumberWindow(HWND hwndParent, HINSTANCE hInstance) {
     return hwndLineNum;
 }
 
+/* Count logical lines (based on newline characters) */
+static int CountLogicalLines(HWND hwndEdit) {
+    int nTextLen = GetWindowTextLength(hwndEdit);
+    if (nTextLen == 0) return 1;
+    
+    /* For performance, use EM_GETLINECOUNT for non-wrapped mode */
+    /* In wrapped mode, we need to count actual newlines */
+    int nLines = 1;
+    
+    /* Get text and count newlines */
+    TCHAR* pText = (TCHAR*)HeapAlloc(GetProcessHeap(), 0, (nTextLen + 1) * sizeof(TCHAR));
+    if (pText) {
+        GetWindowText(hwndEdit, pText, nTextLen + 1);
+        for (int i = 0; i < nTextLen; i++) {
+            if (pText[i] == TEXT('\n')) {
+                nLines++;
+            }
+        }
+        HeapFree(GetProcessHeap(), 0, pText);
+    }
+    
+    return nLines;
+}
+
+/* Get character index for logical line (counting newlines) */
+static int GetLogicalLineCharIndex(HWND hwndEdit, int nLogicalLine) {
+    if (nLogicalLine == 0) return 0;
+    
+    int nTextLen = GetWindowTextLength(hwndEdit);
+    if (nTextLen == 0) return 0;
+    
+    TCHAR* pText = (TCHAR*)HeapAlloc(GetProcessHeap(), 0, (nTextLen + 1) * sizeof(TCHAR));
+    if (!pText) return 0;
+    
+    GetWindowText(hwndEdit, pText, nTextLen + 1);
+    
+    int nCurrentLine = 0;
+    int nCharIndex = 0;
+    
+    for (int i = 0; i < nTextLen && nCurrentLine < nLogicalLine; i++) {
+        if (pText[i] == TEXT('\n')) {
+            nCurrentLine++;
+            if (nCurrentLine == nLogicalLine) {
+                nCharIndex = i + 1;
+                break;
+            }
+        }
+    }
+    
+    HeapFree(GetProcessHeap(), 0, pText);
+    return nCharIndex;
+}
+
 /* Line number window procedure */
 LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -108,18 +161,23 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             int nWidth = rcClient.right - rcClient.left;
             int nHeight = rcClient.bottom - rcClient.top;
             
+            if (nWidth <= 0 || nHeight <= 0) {
+                EndPaint(hwnd, &ps);
+                return 0;
+            }
+            
             /* Create double buffer */
             HDC hdc = CreateCompatibleDC(hdcScreen);
             HBITMAP hBitmap = CreateCompatibleBitmap(hdcScreen, nWidth, nHeight);
             HBITMAP hOldBitmap = (HBITMAP)SelectObject(hdc, hBitmap);
             
-            /* Fill background with light gray */
-            HBRUSH hBrush = CreateSolidBrush(RGB(245, 245, 245));
+            /* Fill background with white (like Notepad++) */
+            HBRUSH hBrush = CreateSolidBrush(RGB(255, 255, 255));
             FillRect(hdc, &rcClient, hBrush);
             DeleteObject(hBrush);
             
-            /* Draw separator line */
-            HPEN hPen = CreatePen(PS_SOLID, 1, RGB(220, 220, 220));
+            /* Draw thin separator line on right edge */
+            HPEN hPen = CreatePen(PS_SOLID, 1, RGB(200, 200, 200));
             HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
             MoveToEx(hdc, rcClient.right - 1, rcClient.top, NULL);
             LineTo(hdc, rcClient.right - 1, rcClient.bottom);
@@ -138,35 +196,46 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             GetTextMetrics(hdc, &tm);
             int nLineHeight = tm.tmHeight;
             
-            /* Get first visible line and total lines */
-            int nFirstLine = GetFirstVisibleLine(hwndEdit);
-            int nTotalLines = GetEditLineCount(hwndEdit);
+            /* Get total logical lines (based on newlines, not visual wrapping) */
+            int nTotalLines = CountLogicalLines(hwndEdit);
             
-            /* Calculate visible lines */
-            int nVisibleLines = nHeight / nLineHeight + 2;
-            
-            /* Set text properties */
+            /* Set text properties - dark gray like Notepad++ */
             SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, RGB(128, 128, 128));
+            SetTextColor(hdc, RGB(80, 80, 80));
             
-            /* 
-             * Calculate top offset to match edit control's text position
-             * Edit control has WS_EX_CLIENTEDGE which adds a 2-pixel border
-             * Plus internal padding of about 1 pixel
-             */
-            int nTopOffset = 3;
-            
-            /* Draw line numbers */
             TCHAR szLineNum[16];
             RECT rcLine;
-            rcLine.left = 2;
-            rcLine.right = rcClient.right - 4;
+            rcLine.left = 0;
+            rcLine.right = rcClient.right - 6;
             
-            for (int i = 0; i < nVisibleLines && (nFirstLine + i) < nTotalLines; i++) {
-                rcLine.top = nTopOffset + (i * nLineHeight);
+            /* Track last Y position to avoid drawing at same position */
+            int nLastY = -10000;
+            
+            for (int nLine = 0; nLine < nTotalLines; nLine++) {
+                /* Get character index at start of this logical line */
+                int nCharIndex = GetLogicalLineCharIndex(hwndEdit, nLine);
+                
+                /* Get Y position of this character */
+                LRESULT lPos = SendMessage(hwndEdit, EM_POSFROMCHAR, nCharIndex, 0);
+                
+                /* Extract Y coordinate - handle as signed short for proper negative values */
+                short nY = (short)HIWORD(lPos);
+                
+                /* Skip if line is above visible area (scrolled past) */
+                if (nY < -nLineHeight) continue;
+                
+                /* Stop if line is below visible area */
+                if (nY > nHeight) break;
+                
+                /* Skip if same Y position as last line */
+                if (nY == nLastY) continue;
+                nLastY = nY;
+                
+                /* Draw line number at correct Y position - align with text baseline */
+                rcLine.top = (int)nY;
                 rcLine.bottom = rcLine.top + nLineHeight;
                 
-                _sntprintf(szLineNum, 16, TEXT("%d"), nFirstLine + i + 1);
+                _sntprintf(szLineNum, 16, TEXT("%d"), nLine + 1);
                 DrawText(hdc, szLineNum, -1, &rcLine, DT_RIGHT | DT_TOP | DT_SINGLELINE);
             }
             
@@ -188,8 +257,6 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
         
         case WM_ERASEBKGND:
             return 1; /* We handle background in WM_PAINT */
-            
-
     }
     
     return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -259,6 +326,9 @@ void ToggleLineNumbers(HWND hwnd) {
 /* Tab control height - must match main.c */
 #define TAB_HEIGHT 28
 
+/* Status bar height */
+#define STATUS_HEIGHT 22
+
 /* Reposition controls based on line number visibility */
 void RepositionControls(HWND hwnd) {
     if (!hwnd || !g_AppState.hwndTab) return;
@@ -272,11 +342,30 @@ void RepositionControls(HWND hwnd) {
     /* Tab control at top */
     int nTabHeight = TAB_HEIGHT;
     
+    /* Get status bar height */
+    int nStatusHeight = 0;
+    if (g_AppState.hwndStatus) {
+        RECT rcStatus;
+        GetWindowRect(g_AppState.hwndStatus, &rcStatus);
+        nStatusHeight = rcStatus.bottom - rcStatus.top;
+        
+        /* Update status bar parts for new width */
+        SetStatusBarParts(g_AppState.hwndStatus, rc.right);
+    }
+    
+    /* Calculate edit area height */
+    int nEditAreaHeight = rc.bottom - nTabHeight - nStatusHeight;
+    if (nEditAreaHeight < 50) nEditAreaHeight = 50;
+    
     /* Use DeferWindowPos for smoother resize */
-    HDWP hdwp = BeginDeferWindowPos(3);
+    HDWP hdwp = BeginDeferWindowPos(4);
     if (!hdwp) {
         /* Fallback to regular MoveWindow */
         MoveWindow(g_AppState.hwndTab, 0, 0, rc.right, nTabHeight, FALSE);
+        
+        if (g_AppState.hwndStatus) {
+            SendMessage(g_AppState.hwndStatus, WM_SIZE, 0, 0);
+        }
         
         TabState* pTab = GetCurrentTabState();
         if (pTab && pTab->hwndEdit) {
@@ -286,17 +375,23 @@ void RepositionControls(HWND hwnd) {
             if (g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
                 int nLineNumWidth = pTab->lineNumState.nLineNumberWidth;
                 if (nLineNumWidth <= 0) nLineNumWidth = DEFAULT_LINE_NUM_WIDTH;
-                MoveWindow(pTab->lineNumState.hwndLineNumbers, 0, nTabHeight, nLineNumWidth, rc.bottom - nTabHeight, FALSE);
+                MoveWindow(pTab->lineNumState.hwndLineNumbers, 0, nTabHeight, nLineNumWidth, nEditAreaHeight, TRUE);
+                ShowWindow(pTab->lineNumState.hwndLineNumbers, SW_SHOW);
                 nEditLeft = nLineNumWidth;
                 nEditWidth = rc.right - nLineNumWidth;
             }
-            MoveWindow(pTab->hwndEdit, nEditLeft, nTabHeight, nEditWidth, rc.bottom - nTabHeight, FALSE);
+            MoveWindow(pTab->hwndEdit, nEditLeft, nTabHeight, nEditWidth, nEditAreaHeight, TRUE);
         }
         InvalidateRect(hwnd, NULL, FALSE);
         return;
     }
     
     hdwp = DeferWindowPos(hdwp, g_AppState.hwndTab, NULL, 0, 0, rc.right, nTabHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+    
+    /* Status bar auto-positions itself, just send WM_SIZE */
+    if (g_AppState.hwndStatus) {
+        SendMessage(g_AppState.hwndStatus, WM_SIZE, 0, 0);
+    }
     
     TabState* pTab = GetCurrentTabState();
     if (!pTab) {
@@ -311,11 +406,11 @@ void RepositionControls(HWND hwnd) {
         int nLineNumWidth = pTab->lineNumState.nLineNumberWidth;
         if (nLineNumWidth <= 0) nLineNumWidth = DEFAULT_LINE_NUM_WIDTH;
         
-        /* Position line number window */
+        /* Position and show line number window */
         hdwp = DeferWindowPos(hdwp, pTab->lineNumState.hwndLineNumbers, NULL,
                    0, nTabHeight, 
-                   nLineNumWidth, rc.bottom - nTabHeight, 
-                   SWP_NOZORDER | SWP_NOACTIVATE);
+                   nLineNumWidth, nEditAreaHeight, 
+                   SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
         
         nEditLeft = nLineNumWidth;
         nEditWidth = rc.right - nLineNumWidth;
@@ -325,7 +420,7 @@ void RepositionControls(HWND hwnd) {
     if (pTab->hwndEdit) {
         hdwp = DeferWindowPos(hdwp, pTab->hwndEdit, NULL,
                    nEditLeft, nTabHeight, 
-                   nEditWidth, rc.bottom - nTabHeight, 
+                   nEditWidth, nEditAreaHeight, 
                    SWP_NOZORDER | SWP_NOACTIVATE);
     }
     

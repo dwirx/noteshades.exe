@@ -200,6 +200,8 @@ void InitTabState(TabState* pState) {
     pState->lineNumState.bShowLineNumbers = FALSE;
     pState->lineNumState.hwndLineNumbers = NULL;
     pState->lineNumState.nLineNumberWidth = 0;
+    pState->lineEnding = LINE_ENDING_CRLF;  /* Default Windows line ending */
+    pState->bInsertMode = TRUE;              /* Default insert mode */
 }
 
 /* Create edit control for a tab */
@@ -481,6 +483,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_CREATE: {
             /* Initialize word wrap to OFF by default */
             g_AppState.bWordWrap = FALSE;
+            g_AppState.bShowLineNumbers = TRUE;  /* Line numbers ON by default */
             g_AppState.nTabCount = 0;
             g_AppState.nCurrentTab = -1;
             
@@ -490,6 +493,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                 DEFAULT_QUALITY, FIXED_PITCH | FF_MODERN, TEXT("Consolas")
             );
+            
+            /* Create status bar */
+            g_AppState.hwndStatus = CreateStatusBar(hwnd, g_AppState.hInstance);
             
             /* Create tab control with owner draw for close buttons */
             g_AppState.hwndTab = CreateWindowEx(
@@ -513,6 +519,24 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             
             /* Create first tab */
             AddNewTab(hwnd, TEXT("Untitled"));
+            
+            /* Initialize menu check marks */
+            HMENU hMenu = GetMenu(hwnd);
+            CheckMenuItem(hMenu, IDM_VIEW_LINENUMBERS, 
+                          g_AppState.bShowLineNumbers ? MF_CHECKED : MF_UNCHECKED);
+            CheckMenuItem(hMenu, IDM_FORMAT_WORDWRAP, 
+                          g_AppState.bWordWrap ? MF_CHECKED : MF_UNCHECKED);
+            
+            /* Start periodic sync timer for line numbers if enabled */
+            if (g_AppState.bShowLineNumbers) {
+                SetTimer(hwnd, 2, 100, NULL);
+            }
+            
+            /* Start status bar update timer */
+            SetTimer(hwnd, TIMER_STATUSBAR, 100, NULL);
+            
+            /* Initial status bar update */
+            UpdateStatusBar(hwnd);
             
             return 0;
         }
@@ -549,6 +573,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 /* Resize debounce timer */
                 KillTimer(hwnd, 3);
                 RepositionControls(hwnd);
+            } else if (wParam == TIMER_STATUSBAR) {
+                /* Update status bar periodically */
+                UpdateStatusBar(hwnd);
             }
             return 0;
         }
