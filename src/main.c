@@ -612,6 +612,26 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
         }
         
+        case WM_ACTIVATE: {
+            /* Auto-focus edit control when window is activated */
+            if (LOWORD(wParam) != WA_INACTIVE) {
+                HWND hwndEdit = GetCurrentEdit();
+                if (hwndEdit) {
+                    SetFocus(hwndEdit);
+                }
+            }
+            return 0;
+        }
+        
+        case WM_SETFOCUS: {
+            /* When main window gets focus, redirect to edit control */
+            HWND hwndEdit = GetCurrentEdit();
+            if (hwndEdit) {
+                SetFocus(hwndEdit);
+            }
+            return 0;
+        }
+        
         case WM_NOTIFY: {
             NMHDR* pnmh = (NMHDR*)lParam;
             if (pnmh->hwndFrom == g_AppState.hwndTab) {
