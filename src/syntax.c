@@ -2,8 +2,8 @@
 #include "syntax.h"
 #include <richedit.h>
 
-/* Global syntax highlighting flag */
-BOOL g_bSyntaxHighlight = TRUE;
+/* Global syntax highlighting flag - OFF by default for better performance */
+BOOL g_bSyntaxHighlight = FALSE;
 
 /* C/C++ keywords */
 static const WCHAR* g_CKeywords[] = {
@@ -350,21 +350,31 @@ void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang) {
     int nLen = GetWindowTextLengthW(hwndEdit);
     if (nLen == 0) return;
     
-    /* Limit highlighting to first 20KB for better performance */
-    /* Files larger than this will only have partial highlighting */
-    if (nLen > 20000) nLen = 20000;
+    /* SKIP syntax highlighting for very large files (> 100KB) for performance */
+    /* This prevents delay when opening large files */
+    if (nLen > 100000) {
+        return; /* No highlighting for files > 100KB */
+    }
+    
+    /* Limit highlighting to first 15KB for better performance */
+    int nHighlightLen = nLen;
+    if (nHighlightLen > 15000) nHighlightLen = 15000;
     
     /* Disable redraw for performance */
     SendMessage(hwndEdit, WM_SETREDRAW, FALSE, 0);
     
-    /* Allocate buffer */
-    WCHAR* pText = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, (nLen + 1) * sizeof(WCHAR));
+    /* Allocate buffer - only for the portion we'll highlight */
+    WCHAR* pText = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, (nHighlightLen + 1) * sizeof(WCHAR));
     if (!pText) {
         SendMessage(hwndEdit, WM_SETREDRAW, TRUE, 0);
         return;
     }
     
-    GetWindowTextW(hwndEdit, pText, nLen + 1);
+    /* Get only the text we need to highlight */
+    SendMessage(hwndEdit, EM_SETSEL, 0, nHighlightLen);
+    SendMessage(hwndEdit, EM_GETSELTEXT, 0, (LPARAM)pText);
+    pText[nHighlightLen] = L'\0';
+    SendMessage(hwndEdit, EM_SETSEL, 0, 0); /* Deselect */
     
     /* Get comment style */
     WCHAR lineComment[8], blockStart[8], blockEnd[8];
@@ -373,8 +383,11 @@ void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang) {
     int blockStartLen = (int)wcslen(blockStart);
     int blockEndLen = (int)wcslen(blockEnd);
     
-    /* First, set all text to default color */
-    SetRangeColor(hwndEdit, 0, nLen, COLOR_DEFAULT);
+    /* First, set highlighted portion to default color */
+    SetRangeColor(hwndEdit, 0, nHighlightLen, COLOR_DEFAULT);
+    
+    /* Use nHighlightLen instead of nLen for the loop */
+    nLen = nHighlightLen;
     
     int i = 0;
     BOOL inBlockComment = FALSE;

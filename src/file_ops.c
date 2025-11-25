@@ -62,7 +62,7 @@ static LineEndingType DetectLineEnding(const char* pBuffer, DWORD dwSize) {
     return LINE_ENDING_CRLF;
 }
 
-/* Read file content into edit control - simple and reliable method */
+/* Read file content into edit control - OPTIMIZED for large files */
 BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
     HANDLE hFile;
     LARGE_INTEGER liFileSize;
@@ -85,12 +85,15 @@ BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
         return FALSE;
     }
     
-    /* Limit to 100MB for practical use with this method */
-    if (liFileSize.HighPart > 0 || liFileSize.LowPart > 100 * 1024 * 1024) {
+    /* Limit to 50MB for better performance */
+    if (liFileSize.HighPart > 0 || liFileSize.LowPart > 50 * 1024 * 1024) {
         CloseHandle(hFile);
-        ShowErrorDialog(GetParent(hEdit), TEXT("File is too large (max 100MB)."));
+        ShowErrorDialog(GetParent(hEdit), TEXT("File is too large (max 50MB for best performance)."));
         return FALSE;
     }
+    
+    /* Disable redraw during loading for MUCH better performance */
+    SendMessage(hEdit, WM_SETREDRAW, FALSE, 0);
     
     dwFileSize = liFileSize.LowPart;
     
@@ -161,6 +164,10 @@ BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
     /* Move cursor to beginning */
     SendMessage(hEdit, EM_SETSEL, 0, 0);
     SendMessage(hEdit, EM_SCROLLCARET, 0, 0);
+    
+    /* Re-enable redraw and refresh */
+    SendMessage(hEdit, WM_SETREDRAW, TRUE, 0);
+    InvalidateRect(hEdit, NULL, TRUE);
     
     return TRUE;
 }
@@ -284,19 +291,23 @@ BOOL FileOpen(HWND hwnd) {
     pTab->bModified = FALSE;
     pTab->bUntitled = FALSE;
     
-    /* Detect language and apply syntax highlighting */
+    /* Detect language */
     pTab->language = DetectLanguage(szFileName);
-    if (g_bSyntaxHighlight && pTab->language != LANG_NONE) {
-        ApplySyntaxHighlighting(hwndEdit, pTab->language);
-    }
     
-    /* Update titles */
+    /* Update titles first (instant feedback) */
     UpdateTabTitle(g_AppState.nCurrentTab);
     UpdateWindowTitle(hwnd);
     
     /* Force redraw */
     InvalidateRect(hwndEdit, NULL, TRUE);
     UpdateWindow(hwndEdit);
+    
+    /* Apply syntax highlighting AFTER display update for better responsiveness */
+    /* Only for small files - large files skip highlighting for performance */
+    int nLen = GetWindowTextLength(hwndEdit);
+    if (g_bSyntaxHighlight && pTab->language != LANG_NONE && nLen < 100000) {
+        ApplySyntaxHighlighting(hwndEdit, pTab->language);
+    }
     
     return TRUE;
 }

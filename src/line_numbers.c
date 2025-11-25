@@ -86,7 +86,7 @@ HWND CreateLineNumberWindow(HWND hwndParent, HINSTANCE hInstance) {
 
 
 
-/* Line number window procedure */
+/* Line number window procedure - OPTIMIZED for large files */
 LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_PAINT: {
@@ -140,6 +140,7 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             TEXTMETRIC tm;
             GetTextMetrics(hdc, &tm);
             int nLineHeight = tm.tmHeight;
+            if (nLineHeight <= 0) nLineHeight = 16;
             
             /* Get first visible line and total line count */
             int nFirstVisible = (int)SendMessage(hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
@@ -158,7 +159,7 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             rcLine.left = 4;
             rcLine.right = rcClient.right - 8;
             
-            /* Draw line numbers for visible lines - get actual Y position from edit control */
+            /* Draw line numbers at EXACT Y positions from edit control */
             for (int i = 0; i < nVisibleLines; i++) {
                 int nLine = nFirstVisible + i;
                 int nLineNum = nLine + 1; /* 1-based line number */
@@ -168,19 +169,21 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
                 
                 /* Get character index at start of this line */
                 int nCharIndex = (int)SendMessage(hwndEdit, EM_LINEINDEX, nLine, 0);
-                if (nCharIndex < 0) break;
+                if (nCharIndex < 0) continue;
                 
-                /* Get Y position of this character from edit control */
+                /* Get EXACT Y position from edit control */
                 LRESULT lPos = SendMessage(hwndEdit, EM_POSFROMCHAR, nCharIndex, 0);
+                if (lPos == -1) continue;
+                
                 int nY = (short)HIWORD(lPos);
                 
-                /* Skip if line is above visible area */
+                /* Skip if above visible area */
                 if (nY < -nLineHeight) continue;
                 
-                /* Stop if line is below visible area */
-                if (nY > nHeight) break;
+                /* Stop if below visible area */
+                if (nY > nHeight + nLineHeight) break;
                 
-                /* Draw line number at the exact Y position */
+                /* Draw line number at exact Y position */
                 rcLine.top = nY;
                 rcLine.bottom = nY + nLineHeight;
                 
@@ -255,8 +258,8 @@ void ToggleLineNumbers(HWND hwnd) {
             
             ShowWindow(pTab->lineNumState.hwndLineNumbers, SW_SHOW);
             
-            /* Start periodic sync timer - 100ms is enough for smooth sync */
-            SetTimer(hwnd, 2, 100, NULL);
+            /* Start periodic sync timer - 50ms for smooth sync */
+            SetTimer(hwnd, 2, 50, NULL);
         } else {
             pTab->lineNumState.bShowLineNumbers = FALSE;
             if (pTab->lineNumState.hwndLineNumbers) {
@@ -324,6 +327,7 @@ void RepositionControls(HWND hwnd) {
             if (g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
                 int nLineNumWidth = pTab->lineNumState.nLineNumberWidth;
                 if (nLineNumWidth <= 0) nLineNumWidth = DEFAULT_LINE_NUM_WIDTH;
+                /* Position at same Y as edit control - we'll handle alignment in paint */
                 MoveWindow(pTab->lineNumState.hwndLineNumbers, 0, nTabHeight, nLineNumWidth, nEditAreaHeight, TRUE);
                 ShowWindow(pTab->lineNumState.hwndLineNumbers, SW_SHOW);
                 nEditLeft = nLineNumWidth;
@@ -355,7 +359,7 @@ void RepositionControls(HWND hwnd) {
         int nLineNumWidth = pTab->lineNumState.nLineNumberWidth;
         if (nLineNumWidth <= 0) nLineNumWidth = DEFAULT_LINE_NUM_WIDTH;
         
-        /* Position line number window at same position as edit control */
+        /* Position at same Y as edit control - alignment handled in paint */
         hdwp = DeferWindowPos(hdwp, pTab->lineNumState.hwndLineNumbers, NULL,
                    0, nTabHeight, 
                    nLineNumWidth, nEditAreaHeight, 
