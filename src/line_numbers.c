@@ -164,17 +164,66 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             rcLine.left = 4;
             rcLine.right = rcClient.right - 8;
             
-            /* Draw line numbers at EXACT Y positions from edit control */
+            /* OPTIMIZED: Pre-calculate logical line for current cursor position ONCE */
+            int nCurrentLogicalLine = 0;
+            if (g_AppState.bRelativeLineNumbers) {
+                int nPrevCharIdx = 0;
+                for (int k = 0; k <= nCurrentLine; k++) {
+                    int kCharIndex = (int)SendMessage(hwndEdit, EM_LINEINDEX, k, 0);
+                    if (kCharIndex < 0) break;
+                    if (k > 0) {
+                        int nPrevLength = (int)SendMessage(hwndEdit, EM_LINELENGTH, nPrevCharIdx, 0);
+                        if (kCharIndex > nPrevCharIdx + nPrevLength) {
+                            nCurrentLogicalLine++;
+                        }
+                    }
+                    nPrevCharIdx = kCharIndex;
+                }
+            }
+            
+            /* OPTIMIZED: Calculate logical line for first visible line ONCE,
+               then increment as we go - O(n) instead of O(n²) */
+            int nLogicalLine = 0;
+            int nPrevCharIndex = 0;
+            
+            /* Calculate logical line number for first visible line */
+            for (int j = 0; j <= nFirstVisible; j++) {
+                int nLineCharIndex = (int)SendMessage(hwndEdit, EM_LINEINDEX, j, 0);
+                if (nLineCharIndex < 0) break;
+                if (j > 0) {
+                    int nPrevLineLength = (int)SendMessage(hwndEdit, EM_LINELENGTH, nPrevCharIndex, 0);
+                    if (nLineCharIndex > nPrevCharIndex + nPrevLineLength) {
+                        nLogicalLine++;
+                    }
+                }
+                nPrevCharIndex = nLineCharIndex;
+            }
+            
+            /* Track last drawn logical line to skip wrapped continuations */
+            int nLastDrawnLogicalLine = -1;
+            
+            /* Draw visible lines - now O(visible_lines) not O(visible_lines * total_lines) */
             for (int i = 0; i < nVisibleLines; i++) {
-                int nLine = nFirstVisible + i;
-                int nLineNum = nLine + 1; /* 1-based line number */
+                int nVisualLine = nFirstVisible + i;
                 
-                /* Stop if we've passed the last line */
-                if (nLineNum > nTotalLines) break;
+                /* Stop if we've passed the last visual line */
+                if (nVisualLine >= nTotalLines) break;
                 
-                /* Get character index at start of this line */
-                int nCharIndex = (int)SendMessage(hwndEdit, EM_LINEINDEX, nLine, 0);
+                /* Get character index at start of this visual line */
+                int nCharIndex = (int)SendMessage(hwndEdit, EM_LINEINDEX, nVisualLine, 0);
                 if (nCharIndex < 0) continue;
+                
+                /* OPTIMIZED: For lines after first, check if this is a new logical line
+                   by comparing with previous line - no nested loop needed */
+                if (i > 0) {
+                    int nPrevLineLength = (int)SendMessage(hwndEdit, EM_LINELENGTH, nPrevCharIndex, 0);
+                    if (nCharIndex > nPrevCharIndex + nPrevLineLength) {
+                        /* Gap means line break - new logical line */
+                        nLogicalLine++;
+                    }
+                    /* If equal, it's a wrapped continuation - same logical line */
+                }
+                nPrevCharIndex = nCharIndex;
                 
                 /* Get EXACT Y position from edit control */
                 LRESULT lPos = SendMessage(hwndEdit, EM_POSFROMCHAR, nCharIndex, 0);
@@ -188,21 +237,25 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
                 /* Stop if below visible area */
                 if (nY > nHeight + nLineHeight) break;
                 
+                /* Only draw line number for the FIRST visual line of each logical line */
+                if (nLogicalLine == nLastDrawnLogicalLine) {
+                    continue; /* This is a wrapped line, don't draw number */
+                }
+                nLastDrawnLogicalLine = nLogicalLine;
+                
                 /* Draw line number at exact Y position */
                 rcLine.top = nY;
                 rcLine.bottom = nY + nLineHeight;
                 
-                /* Calculate display number based on relative mode */
+                int nLineNum = nLogicalLine + 1; /* 1-based line number */
                 int nDisplayNum;
+                
                 if (g_AppState.bRelativeLineNumbers) {
-                    if (nLine == nCurrentLine) {
-                        /* Current line shows absolute number */
+                    if (nLogicalLine == nCurrentLogicalLine) {
                         nDisplayNum = nLineNum;
-                        /* Highlight current line number */
                         SetTextColor(hdc, RGB(0, 0, 0)); /* Black for current */
                     } else {
-                        /* Other lines show relative distance */
-                        nDisplayNum = abs(nLine - nCurrentLine);
+                        nDisplayNum = abs(nLogicalLine - nCurrentLogicalLine);
                         SetTextColor(hdc, RGB(100, 100, 100)); /* Gray for relative */
                     }
                 } else {
