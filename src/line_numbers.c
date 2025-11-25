@@ -223,11 +223,17 @@ void ToggleLineNumbers(HWND hwnd) {
             pTab->lineNumState.bShowLineNumbers = TRUE;
             
             ShowWindow(pTab->lineNumState.hwndLineNumbers, SW_SHOW);
+            
+            /* Start periodic sync timer */
+            SetTimer(hwnd, 2, 50, NULL);
         } else {
             pTab->lineNumState.bShowLineNumbers = FALSE;
             if (pTab->lineNumState.hwndLineNumbers) {
                 ShowWindow(pTab->lineNumState.hwndLineNumbers, SW_HIDE);
             }
+            
+            /* Stop periodic sync timer */
+            KillTimer(hwnd, 2);
         }
     }
     

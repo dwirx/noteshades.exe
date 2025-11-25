@@ -20,12 +20,55 @@ static WNDPROC g_OrigEditProc = NULL;
 static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_VSCROLL:
-        case WM_MOUSEWHEEL:
-        case WM_KEYDOWN: {
+        case WM_HSCROLL:
+        case WM_MOUSEWHEEL: {
             /* Call original proc first */
             LRESULT result = CallWindowProc(g_OrigEditProc, hwnd, msg, wParam, lParam);
             
             /* Then sync line numbers */
+            TabState* pTab = GetCurrentTabState();
+            if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+            }
+            return result;
+        }
+        
+        case WM_KEYDOWN:
+        case WM_KEYUP: {
+            /* Call original proc first */
+            LRESULT result = CallWindowProc(g_OrigEditProc, hwnd, msg, wParam, lParam);
+            
+            /* Sync line numbers for navigation keys */
+            if (wParam == VK_UP || wParam == VK_DOWN || wParam == VK_PRIOR || 
+                wParam == VK_NEXT || wParam == VK_HOME || wParam == VK_END) {
+                TabState* pTab = GetCurrentTabState();
+                if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                    SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+                }
+            }
+            return result;
+        }
+        
+        case WM_LBUTTONDOWN:
+        case WM_LBUTTONUP: {
+            /* Call original proc first */
+            LRESULT result = CallWindowProc(g_OrigEditProc, hwnd, msg, wParam, lParam);
+            
+            /* Sync line numbers after mouse click (might cause scroll) */
+            TabState* pTab = GetCurrentTabState();
+            if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+            }
+            return result;
+        }
+        
+        case EM_SCROLL:
+        case EM_LINESCROLL:
+        case WM_SIZE: {
+            /* Call original proc first */
+            LRESULT result = CallWindowProc(g_OrigEditProc, hwnd, msg, wParam, lParam);
+            
+            /* Sync line numbers */
             TabState* pTab = GetCurrentTabState();
             if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
                 SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
@@ -41,6 +84,94 @@ static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
 
 /* Close button size */
 #define CLOSE_BTN_SIZE 16
+
+/* Hover tracking for close button */
+static int g_nHoverTab = -1;
+static BOOL g_bHoverClose = FALSE;
+static BOOL g_bTrackingMouse = FALSE;
+
+/* Original tab control window procedure */
+static WNDPROC g_OrigTabProc = NULL;
+
+/* Subclassed tab control procedure to catch mouse events */
+static LRESULT CALLBACK TabSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+        case WM_MOUSEMOVE: {
+            /* Track mouse for close button hover effect */
+            POINT pt = {LOWORD(lParam), HIWORD(lParam)};
+            
+            /* Enable mouse leave tracking */
+            if (!g_bTrackingMouse) {
+                TRACKMOUSEEVENT tme = {0};
+                tme.cbSize = sizeof(tme);
+                tme.dwFlags = TME_LEAVE;
+                tme.hwndTrack = hwnd;
+                TrackMouseEvent(&tme);
+                g_bTrackingMouse = TRUE;
+            }
+            
+            int nOldHoverTab = g_nHoverTab;
+            BOOL bOldHoverClose = g_bHoverClose;
+            g_nHoverTab = -1;
+            g_bHoverClose = FALSE;
+            
+            TCHITTESTINFO htInfo;
+            htInfo.pt = pt;
+            int nTab = TabCtrl_HitTest(hwnd, &htInfo);
+            
+            if (nTab >= 0) {
+                RECT rcItem;
+                TabCtrl_GetItemRect(hwnd, nTab, &rcItem);
+                int closeX = rcItem.right - CLOSE_BTN_SIZE - 4;
+                
+                if (pt.x >= closeX && pt.x <= rcItem.right) {
+                    g_nHoverTab = nTab;
+                    g_bHoverClose = TRUE;
+                }
+            }
+            
+            /* Redraw tab if hover state changed */
+            if (nOldHoverTab != g_nHoverTab || bOldHoverClose != g_bHoverClose) {
+                InvalidateRect(hwnd, NULL, FALSE);
+            }
+            break;
+        }
+        
+        case WM_MOUSELEAVE: {
+            g_bTrackingMouse = FALSE;
+            if (g_nHoverTab >= 0 || g_bHoverClose) {
+                g_nHoverTab = -1;
+                g_bHoverClose = FALSE;
+                InvalidateRect(hwnd, NULL, FALSE);
+            }
+            break;
+        }
+        
+        case WM_LBUTTONUP: {
+            /* Check if click is on close button */
+            POINT pt = {LOWORD(lParam), HIWORD(lParam)};
+            
+            TCHITTESTINFO htInfo;
+            htInfo.pt = pt;
+            int nTab = TabCtrl_HitTest(hwnd, &htInfo);
+            
+            if (nTab >= 0) {
+                RECT rcItem;
+                TabCtrl_GetItemRect(hwnd, nTab, &rcItem);
+                int closeX = rcItem.right - CLOSE_BTN_SIZE - 4;
+                
+                if (pt.x >= closeX) {
+                    /* Get parent window and close tab */
+                    HWND hwndParent = GetParent(hwnd);
+                    CloseTab(hwndParent, nTab);
+                    return 0;
+                }
+            }
+            break;
+        }
+    }
+    return CallWindowProc(g_OrigTabProc, hwnd, msg, wParam, lParam);
+}
 
 /* Get current edit control */
 HWND GetCurrentEdit(void) {
@@ -374,6 +505,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             );
             SendMessage(g_AppState.hwndTab, WM_SETFONT, (WPARAM)g_hFont, TRUE);
             
+            /* Subclass tab control to handle mouse events for close button */
+            g_OrigTabProc = (WNDPROC)SetWindowLongPtr(g_AppState.hwndTab, GWLP_WNDPROC, (LONG_PTR)TabSubclassProc);
+            
             /* Set tab item size for close button */
             TabCtrl_SetItemSize(g_AppState.hwndTab, 120, TAB_HEIGHT - 4);
             
@@ -406,6 +540,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 TabState* pTab = GetCurrentTabState();
                 if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
                     SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+                }
+            } else if (wParam == 2) {
+                /* Periodic sync timer for line numbers */
+                TabState* pTab = GetCurrentTabState();
+                if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                    static int s_nLastFirstLine = -1;
+                    int nFirstLine = (int)SendMessage(pTab->hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
+                    if (nFirstLine != s_nLastFirstLine) {
+                        s_nLastFirstLine = nFirstLine;
+                        SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+                    }
                 }
             }
             return 0;
@@ -453,8 +598,21 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 rcClose.top = pDIS->rcItem.top + (pDIS->rcItem.bottom - pDIS->rcItem.top - CLOSE_BTN_SIZE) / 2;
                 rcClose.bottom = rcClose.top + CLOSE_BTN_SIZE;
                 
-                /* Draw X */
-                HPEN hPen = CreatePen(PS_SOLID, 2, RGB(100, 100, 100));
+                /* Check if hovering over this tab's close button */
+                BOOL bHoverThisClose = (g_nHoverTab == (int)pDIS->itemID && g_bHoverClose);
+                
+                /* Draw close button background if hovering */
+                if (bHoverThisClose) {
+                    HBRUSH hCloseBrush = CreateSolidBrush(RGB(232, 17, 35));
+                    RECT rcCloseBg = rcClose;
+                    InflateRect(&rcCloseBg, 2, 2);
+                    FillRect(pDIS->hDC, &rcCloseBg, hCloseBrush);
+                    DeleteObject(hCloseBrush);
+                }
+                
+                /* Draw X with appropriate color */
+                COLORREF closeColor = bHoverThisClose ? RGB(255, 255, 255) : RGB(100, 100, 100);
+                HPEN hPen = CreatePen(PS_SOLID, 2, closeColor);
                 HPEN hOldPen = (HPEN)SelectObject(pDIS->hDC, hPen);
                 MoveToEx(pDIS->hDC, rcClose.left + 3, rcClose.top + 3, NULL);
                 LineTo(pDIS->hDC, rcClose.right - 3, rcClose.bottom - 3);
@@ -469,7 +627,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
         
         case WM_LBUTTONUP: {
-            /* Check if click is on tab close button */
+            /* Check if click is on tab close button (backup handler) */
             POINT pt = {LOWORD(lParam), HIWORD(lParam)};
             HWND hwndTab = g_AppState.hwndTab;
             
