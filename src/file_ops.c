@@ -1,5 +1,6 @@
 #include "notepad.h"
 #include "syntax.h"
+#include "session.h"
 #include <stdio.h>
 
 /* Update window title based on current tab */
@@ -309,6 +310,9 @@ BOOL FileOpen(HWND hwnd) {
         ApplySyntaxHighlighting(hwndEdit, pTab->language);
     }
     
+    /* Sync to session for persistence */
+    SyncNewFileToSession(g_AppState.nCurrentTab);
+    
     return TRUE;
 }
 
@@ -328,6 +332,9 @@ BOOL FileSave(HWND hwnd) {
     
     pTab->bModified = FALSE;
     UpdateTabTitle(g_AppState.nCurrentTab);
+    
+    /* Sync to session */
+    MarkSessionDirty();
     
     return TRUE;
 }
@@ -358,8 +365,14 @@ BOOL FileSaveAs(HWND hwnd) {
     pTab->bModified = FALSE;
     pTab->bUntitled = FALSE;
     
+    /* Detect language for new file */
+    pTab->language = DetectLanguage(szFileName);
+    
     UpdateTabTitle(g_AppState.nCurrentTab);
     UpdateWindowTitle(hwnd);
+    
+    /* Sync to session */
+    MarkSessionDirty();
     
     return TRUE;
 }

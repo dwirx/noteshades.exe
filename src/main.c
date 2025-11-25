@@ -1,6 +1,7 @@
 #include "notepad.h"
 #include "syntax.h"
 #include "vim_mode.h"
+#include "session.h"
 #include <richedit.h>
 
 /* Global application state */
@@ -368,6 +369,9 @@ void CloseTab(HWND hwnd, int nTabIndex) {
     
     g_AppState.nTabCount--;
     
+    /* Sync session after tab close */
+    MarkSessionDirty();
+    
     /* If no tabs left, create a new one */
     if (g_AppState.nTabCount == 0) {
         AddNewTab(hwnd, TEXT("Untitled"));
@@ -539,8 +543,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             /* Set tab item size for close button */
             TabCtrl_SetItemSize(g_AppState.hwndTab, 120, TAB_HEIGHT - 4);
             
-            /* Create first tab */
-            AddNewTab(hwnd, TEXT("Untitled"));
+            /* Try to load previous session, otherwise create first tab */
+            if (!LoadSession(hwnd)) {
+                AddNewTab(hwnd, TEXT("Untitled"));
+            }
             
             /* Initialize menu check marks */
             HMENU hMenu = GetMenu(hwnd);
@@ -560,6 +566,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             
             /* Start status bar update timer */
             SetTimer(hwnd, TIMER_STATUSBAR, 100, NULL);
+            
+            /* Initialize session system (auto-save timer) */
+            InitSessionSystem(hwnd);
             
             /* Initial status bar update */
             UpdateStatusBar(hwnd);
@@ -602,6 +611,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             } else if (wParam == TIMER_STATUSBAR) {
                 /* Update status bar periodically */
                 UpdateStatusBar(hwnd);
+            } else if (wParam == TIMER_AUTOSAVE) {
+                /* Auto-save session periodically */
+                HandleSessionTimer(hwnd);
             }
             return 0;
         }
@@ -923,6 +935,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
 
         case WM_CLOSE: {
+            /* Save session before closing */
+            SaveSessionOnExit(hwnd);
+            
             /* Check all tabs for unsaved changes */
             for (int i = 0; i < g_AppState.nTabCount; i++) {
                 if (g_AppState.tabs[i].bModified) {
@@ -937,6 +952,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
         
         case WM_DESTROY:
+            /* Cleanup session system */
+            CleanupSessionSystem();
+            
             /* Cleanup all tabs */
             for (int i = 0; i < g_AppState.nTabCount; i++) {
                 if (g_AppState.tabs[i].hwndEdit) {

@@ -12,7 +12,7 @@ TARGET = xnote.exe
 
 # Compiler flags for Win32 (optimized)
 CFLAGS = -Wall -Wextra -O3 -DUNICODE -D_UNICODE
-LDFLAGS = -mwindows -lcomctl32 -lcomdlg32 -s
+LDFLAGS = -mwindows -lcomctl32 -lcomdlg32 -lshell32 -s
 
 # Resource compiler flags (fix for paths with spaces)
 RCFLAGS = "--preprocessor=gcc -E -xc -DRC_INVOKED"
@@ -25,10 +25,11 @@ SRCS = $(SRC_DIR)/main.c \
        $(SRC_DIR)/line_numbers.c \
        $(SRC_DIR)/statusbar.c \
        $(SRC_DIR)/syntax.c \
-       $(SRC_DIR)/vim_mode.c
+       $(SRC_DIR)/vim_mode.c \
+       $(SRC_DIR)/session.c
 
 # Object files
-OBJS = $(SRC_DIR)/main.o $(SRC_DIR)/file_ops.o $(SRC_DIR)/edit_ops.o $(SRC_DIR)/dialogs.o $(SRC_DIR)/line_numbers.o $(SRC_DIR)/statusbar.o $(SRC_DIR)/syntax.o $(SRC_DIR)/vim_mode.o
+OBJS = $(SRC_DIR)/main.o $(SRC_DIR)/file_ops.o $(SRC_DIR)/edit_ops.o $(SRC_DIR)/dialogs.o $(SRC_DIR)/line_numbers.o $(SRC_DIR)/statusbar.o $(SRC_DIR)/syntax.o $(SRC_DIR)/vim_mode.o $(SRC_DIR)/session.o
 
 # Resource files
 RES_SRC = $(SRC_DIR)/notepad.rc
@@ -66,6 +67,9 @@ $(SRC_DIR)/syntax.o: $(SRC_DIR)/syntax.c $(SRC_DIR)/notepad.h $(SRC_DIR)/syntax.
 
 $(SRC_DIR)/vim_mode.o: $(SRC_DIR)/vim_mode.c $(SRC_DIR)/vim_mode.h $(SRC_DIR)/notepad.h $(SRC_DIR)/resource.h
 	$(CC) $(CFLAGS) -c $(SRC_DIR)/vim_mode.c -o $(SRC_DIR)/vim_mode.o
+
+$(SRC_DIR)/session.o: $(SRC_DIR)/session.c $(SRC_DIR)/session.h $(SRC_DIR)/notepad.h $(SRC_DIR)/resource.h
+	$(CC) $(CFLAGS) -c $(SRC_DIR)/session.c -o $(SRC_DIR)/session.o
 
 # Compile resource file
 $(RES_OBJ): $(RES_SRC) $(SRC_DIR)/resource.h
