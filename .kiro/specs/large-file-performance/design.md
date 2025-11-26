@@ -98,6 +98,11 @@ FileModeType DetectOptimalFileMode(DWORD dwFileSize);
 #define THRESHOLD_PARTIAL       (2 * 1024 * 1024)   /* 2MB */
 #define THRESHOLD_READONLY      (10 * 1024 * 1024)  /* 10MB */
 #define THRESHOLD_MMAP          (50 * 1024 * 1024)  /* 50MB */
+
+/* Scroll optimization thresholds */
+#define LINE_COUNT_DEBOUNCE_THRESHOLD  5000   /* Enable debouncing for files with >5000 lines */
+#define LINE_COUNT_SIMPLIFIED_RENDER   10000  /* Use simplified line number rendering */
+#define LINE_COUNT_DISABLE_LINENUMS    100000 /* Disable line numbers entirely */
 #define THRESHOLD_SYNTAX_OFF    (256 * 1024)        /* 256KB - disable syntax */
 #define THRESHOLD_LINE_SYNTAX   5000                /* 5000 lines - disable syntax */
 ```

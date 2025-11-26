@@ -42,6 +42,9 @@ static BOOL g_bScrollPending = FALSE;
 static DWORD g_dwLastScrollTime = 0;
 #define SCROLL_DEBOUNCE_MS 16  /* ~60 FPS for smooth scrolling */
 
+/* Threshold for line count based debouncing (files with many lines need debouncing regardless of size) */
+#define LINE_COUNT_DEBOUNCE_THRESHOLD 5000
+
 /* Subclassed edit control procedure to catch scroll events and vim keys */
 static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     /* Process vim keys first if vim mode is enabled */
@@ -78,28 +81,35 @@ static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             /* Call original proc first */
             LRESULT result = CallWindowProc(g_OrigEditProc, hwnd, msg, wParam, lParam);
             
-            /* Use debouncing for large files to prevent excessive rendering (Requirement 4.3) */
+            /* Use debouncing for large files OR files with many lines (Requirement 4.3, 4.4) */
             TabState* pTab = GetCurrentTabState();
-            if (pTab && pTab->dwTotalFileSize > THRESHOLD_PARTIAL) {
-                /* Large file - use debounced scroll */
-                DWORD dwNow = GetTickCount();
-                if (dwNow - g_dwLastScrollTime < SCROLL_DEBOUNCE_MS) {
-                    /* Too soon - set timer for delayed update */
-                    if (!g_bScrollPending) {
-                        SetTimer(hwnd, TIMER_SCROLL_DEBOUNCE, SCROLL_DEBOUNCE_MS, NULL);
-                        g_bScrollPending = TRUE;
+            if (pTab) {
+                /* Check both file size AND line count for debouncing decision */
+                int nLineCount = (int)SendMessage(hwnd, EM_GETLINECOUNT, 0, 0);
+                BOOL bNeedsDebouncing = (pTab->dwTotalFileSize > THRESHOLD_PARTIAL) || 
+                                        (nLineCount > LINE_COUNT_DEBOUNCE_THRESHOLD);
+                
+                if (bNeedsDebouncing) {
+                    /* Large file or many lines - use debounced scroll */
+                    DWORD dwNow = GetTickCount();
+                    if (dwNow - g_dwLastScrollTime < SCROLL_DEBOUNCE_MS) {
+                        /* Too soon - set timer for delayed update */
+                        if (!g_bScrollPending) {
+                            SetTimer(hwnd, TIMER_SCROLL_DEBOUNCE, SCROLL_DEBOUNCE_MS, NULL);
+                            g_bScrollPending = TRUE;
+                        }
+                    } else {
+                        /* Enough time passed - update immediately */
+                        g_dwLastScrollTime = dwNow;
+                        if (g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                            SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+                        }
                     }
                 } else {
-                    /* Enough time passed - update immediately */
-                    g_dwLastScrollTime = dwNow;
-                    if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                    /* Small file with few lines - sync immediately */
+                    if (g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
                         SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
                     }
-                }
-            } else {
-                /* Small file - sync immediately */
-                if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
-                    SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
                 }
             }
             return result;

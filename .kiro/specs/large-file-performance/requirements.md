@@ -75,8 +75,10 @@ Dokumen ini mendefinisikan requirements untuk optimasi performa aplikasi XNote d
 1. WHILE pengguna melakukan scroll pada file besar THEN XNote SHALL mempertahankan frame rate minimal 30 FPS
 2. WHEN file dimuat dalam mode memory-mapped THEN XNote SHALL hanya memuat bagian yang terlihat ke memori
 3. WHEN pengguna scroll cepat THEN XNote SHALL menggunakan teknik debouncing dengan interval 16ms untuk menghindari rendering berlebihan
-4. WHEN file memiliki lebih dari 10000 baris THEN XNote SHALL menonaktifkan line number sync saat scrolling cepat
+4. WHEN file memiliki lebih dari 5000 baris THEN XNote SHALL mengaktifkan scroll debouncing terlepas dari ukuran file
 5. WHILE scrolling THEN XNote SHALL menonaktifkan WM_SETREDRAW untuk mencegah flicker
+6. WHEN file memiliki lebih dari 10000 baris THEN XNote SHALL menggunakan simplified line number rendering tanpa per-line SendMessage calls
+7. WHEN scroll event terjadi pada file dengan lebih dari 5000 baris THEN XNote SHALL membatasi line number repaint ke maksimal 60 FPS
 
 ### Requirement 5
 

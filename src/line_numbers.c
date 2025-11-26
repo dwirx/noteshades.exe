@@ -113,11 +113,13 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
                 return 0;
             }
 
+            /* Get total line count ONCE - this is the main performance metric */
+            int nTotalLines = (int)SendMessage(hwndEdit, EM_GETLINECOUNT, 0, 0);
+            if (nTotalLines < 1) nTotalLines = 1;
+            
             /* OPTIMIZATION: For extremely large files (>100k lines),
-             * skip line number rendering to prevent scroll lag.
-             * Line numbers add significant overhead for huge files. */
-            int nTotalLinesQuick = (int)SendMessage(hwndEdit, EM_GETLINECOUNT, 0, 0);
-            if (nTotalLinesQuick > 100000) {
+             * skip line number rendering to prevent scroll lag. */
+            if (nTotalLines > 100000) {
                 /* Just draw background and skip numbering */
                 const ThemeColors* pTheme = GetThemeColors();
                 HBRUSH hBrush = CreateSolidBrush(pTheme->crLineNumBg);
@@ -134,6 +136,10 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
                 EndPaint(hwnd, &ps);
                 return 0;
             }
+            
+            /* OPTIMIZATION: For files with >10000 lines, use SIMPLIFIED rendering
+             * Skip word-wrap detection and per-line position queries */
+            BOOL bSimplifiedMode = (nTotalLines > 10000);
             
             /* Create double buffer */
             HDC hdc = CreateCompatibleDC(hdcScreen);
@@ -168,10 +174,8 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             int nLineHeight = tm.tmHeight;
             if (nLineHeight <= 0) nLineHeight = 16;
             
-            /* Get first visible line and total line count */
+            /* Get first visible line */
             int nFirstVisible = (int)SendMessage(hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
-            int nTotalLines = (int)SendMessage(hwndEdit, EM_GETLINECOUNT, 0, 0);
-            if (nTotalLines < 1) nTotalLines = 1;
             
             /* Calculate how many lines can fit in visible area */
             int nVisibleLines = (nHeight / nLineHeight) + 2;
@@ -180,116 +184,145 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, pTheme->crLineNumber);
             
-            /* Get current line for relative numbering */
-            DWORD dwCursorPos = 0, dwCursorEnd = 0;
-            SendMessage(hwndEdit, EM_GETSEL, (WPARAM)&dwCursorPos, (LPARAM)&dwCursorEnd);
-            int nCurrentLine = (int)SendMessage(hwndEdit, EM_LINEFROMCHAR, dwCursorPos, 0);
-            
             TCHAR szLineNum[16];
             RECT rcLine;
             rcLine.left = 4;
             rcLine.right = rcClient.right - 8;
             
-            /* OPTIMIZED: Pre-calculate logical line for current cursor position ONCE */
-            int nCurrentLogicalLine = 0;
-            if (g_AppState.bRelativeLineNumbers) {
-                int nPrevCharIdx = 0;
-                for (int k = 0; k <= nCurrentLine; k++) {
-                    int kCharIndex = (int)SendMessage(hwndEdit, EM_LINEINDEX, k, 0);
-                    if (kCharIndex < 0) break;
-                    if (k > 0) {
-                        int nPrevLength = (int)SendMessage(hwndEdit, EM_LINELENGTH, nPrevCharIdx, 0);
-                        if (kCharIndex > nPrevCharIdx + nPrevLength) {
-                            nCurrentLogicalLine++;
+            if (bSimplifiedMode) {
+                /* SIMPLIFIED MODE for large files (>10000 lines):
+                 * - Assume no word wrap (1 visual line = 1 logical line)
+                 * - Use calculated Y positions instead of EM_POSFROMCHAR
+                 * - Much faster: O(visible_lines) with minimal SendMessage calls */
+                
+                /* Get current line for relative numbering (only if enabled) */
+                int nCurrentLine = 0;
+                if (g_AppState.bRelativeLineNumbers) {
+                    DWORD dwCursorPos = 0;
+                    SendMessage(hwndEdit, EM_GETSEL, (WPARAM)&dwCursorPos, 0);
+                    nCurrentLine = (int)SendMessage(hwndEdit, EM_LINEFROMCHAR, dwCursorPos, 0);
+                }
+                
+                /* Draw visible lines using calculated positions */
+                for (int i = 0; i < nVisibleLines; i++) {
+                    int nLine = nFirstVisible + i;
+                    if (nLine >= nTotalLines) break;
+                    
+                    /* Calculate Y position directly - no SendMessage needed */
+                    int nY = i * nLineHeight;
+                    
+                    rcLine.top = nY;
+                    rcLine.bottom = nY + nLineHeight;
+                    
+                    int nDisplayNum;
+                    if (g_AppState.bRelativeLineNumbers) {
+                        if (nLine == nCurrentLine) {
+                            nDisplayNum = nLine + 1;
+                            SetTextColor(hdc, RGB(0, 0, 0));
+                        } else {
+                            nDisplayNum = abs(nLine - nCurrentLine);
+                            SetTextColor(hdc, RGB(100, 100, 100));
+                        }
+                    } else {
+                        nDisplayNum = nLine + 1;
+                    }
+                    
+                    _sntprintf(szLineNum, 16, TEXT("%d"), nDisplayNum);
+                    DrawText(hdc, szLineNum, -1, &rcLine, DT_RIGHT | DT_TOP | DT_SINGLELINE);
+                }
+            } else {
+                /* FULL MODE for smaller files (<10000 lines):
+                 * - Handle word wrap correctly
+                 * - Use EM_POSFROMCHAR for exact positioning */
+                
+                /* Get current line for relative numbering */
+                DWORD dwCursorPos = 0, dwCursorEnd = 0;
+                SendMessage(hwndEdit, EM_GETSEL, (WPARAM)&dwCursorPos, (LPARAM)&dwCursorEnd);
+                int nCurrentLine = (int)SendMessage(hwndEdit, EM_LINEFROMCHAR, dwCursorPos, 0);
+                
+                /* Pre-calculate logical line for current cursor position ONCE */
+                int nCurrentLogicalLine = 0;
+                if (g_AppState.bRelativeLineNumbers) {
+                    int nPrevCharIdx = 0;
+                    for (int k = 0; k <= nCurrentLine; k++) {
+                        int kCharIndex = (int)SendMessage(hwndEdit, EM_LINEINDEX, k, 0);
+                        if (kCharIndex < 0) break;
+                        if (k > 0) {
+                            int nPrevLength = (int)SendMessage(hwndEdit, EM_LINELENGTH, nPrevCharIdx, 0);
+                            if (kCharIndex > nPrevCharIdx + nPrevLength) {
+                                nCurrentLogicalLine++;
+                            }
+                        }
+                        nPrevCharIdx = kCharIndex;
+                    }
+                }
+                
+                /* Calculate logical line for first visible line ONCE */
+                int nLogicalLine = 0;
+                int nPrevCharIndex = 0;
+                
+                for (int j = 0; j <= nFirstVisible; j++) {
+                    int nLineCharIndex = (int)SendMessage(hwndEdit, EM_LINEINDEX, j, 0);
+                    if (nLineCharIndex < 0) break;
+                    if (j > 0) {
+                        int nPrevLineLength = (int)SendMessage(hwndEdit, EM_LINELENGTH, nPrevCharIndex, 0);
+                        if (nLineCharIndex > nPrevCharIndex + nPrevLineLength) {
+                            nLogicalLine++;
                         }
                     }
-                    nPrevCharIdx = kCharIndex;
+                    nPrevCharIndex = nLineCharIndex;
                 }
-            }
-            
-            /* OPTIMIZED: Calculate logical line for first visible line ONCE,
-               then increment as we go - O(n) instead of O(n²) */
-            int nLogicalLine = 0;
-            int nPrevCharIndex = 0;
-            
-            /* Calculate logical line number for first visible line */
-            for (int j = 0; j <= nFirstVisible; j++) {
-                int nLineCharIndex = (int)SendMessage(hwndEdit, EM_LINEINDEX, j, 0);
-                if (nLineCharIndex < 0) break;
-                if (j > 0) {
-                    int nPrevLineLength = (int)SendMessage(hwndEdit, EM_LINELENGTH, nPrevCharIndex, 0);
-                    if (nLineCharIndex > nPrevCharIndex + nPrevLineLength) {
-                        nLogicalLine++;
+                
+                /* Track last drawn logical line to skip wrapped continuations */
+                int nLastDrawnLogicalLine = -1;
+                
+                /* Draw visible lines */
+                for (int i = 0; i < nVisibleLines; i++) {
+                    int nVisualLine = nFirstVisible + i;
+                    if (nVisualLine >= nTotalLines) break;
+                    
+                    int nCharIndex = (int)SendMessage(hwndEdit, EM_LINEINDEX, nVisualLine, 0);
+                    if (nCharIndex < 0) continue;
+                    
+                    if (i > 0) {
+                        int nPrevLineLength = (int)SendMessage(hwndEdit, EM_LINELENGTH, nPrevCharIndex, 0);
+                        if (nCharIndex > nPrevCharIndex + nPrevLineLength) {
+                            nLogicalLine++;
+                        }
                     }
-                }
-                nPrevCharIndex = nLineCharIndex;
-            }
-            
-            /* Track last drawn logical line to skip wrapped continuations */
-            int nLastDrawnLogicalLine = -1;
-            
-            /* Draw visible lines - now O(visible_lines) not O(visible_lines * total_lines) */
-            for (int i = 0; i < nVisibleLines; i++) {
-                int nVisualLine = nFirstVisible + i;
-                
-                /* Stop if we've passed the last visual line */
-                if (nVisualLine >= nTotalLines) break;
-                
-                /* Get character index at start of this visual line */
-                int nCharIndex = (int)SendMessage(hwndEdit, EM_LINEINDEX, nVisualLine, 0);
-                if (nCharIndex < 0) continue;
-                
-                /* OPTIMIZED: For lines after first, check if this is a new logical line
-                   by comparing with previous line - no nested loop needed */
-                if (i > 0) {
-                    int nPrevLineLength = (int)SendMessage(hwndEdit, EM_LINELENGTH, nPrevCharIndex, 0);
-                    if (nCharIndex > nPrevCharIndex + nPrevLineLength) {
-                        /* Gap means line break - new logical line */
-                        nLogicalLine++;
-                    }
-                    /* If equal, it's a wrapped continuation - same logical line */
-                }
-                nPrevCharIndex = nCharIndex;
-                
-                /* Get EXACT Y position from edit control */
-                LRESULT lPos = SendMessage(hwndEdit, EM_POSFROMCHAR, nCharIndex, 0);
-                if (lPos == -1) continue;
-                
-                int nY = (short)HIWORD(lPos);
-                
-                /* Skip if above visible area */
-                if (nY < -nLineHeight) continue;
-                
-                /* Stop if below visible area */
-                if (nY > nHeight + nLineHeight) break;
-                
-                /* Only draw line number for the FIRST visual line of each logical line */
-                if (nLogicalLine == nLastDrawnLogicalLine) {
-                    continue; /* This is a wrapped line, don't draw number */
-                }
-                nLastDrawnLogicalLine = nLogicalLine;
-                
-                /* Draw line number at exact Y position */
-                rcLine.top = nY;
-                rcLine.bottom = nY + nLineHeight;
-                
-                int nLineNum = nLogicalLine + 1; /* 1-based line number */
-                int nDisplayNum;
-                
-                if (g_AppState.bRelativeLineNumbers) {
-                    if (nLogicalLine == nCurrentLogicalLine) {
-                        nDisplayNum = nLineNum;
-                        SetTextColor(hdc, RGB(0, 0, 0)); /* Black for current */
+                    nPrevCharIndex = nCharIndex;
+                    
+                    LRESULT lPos = SendMessage(hwndEdit, EM_POSFROMCHAR, nCharIndex, 0);
+                    if (lPos == -1) continue;
+                    
+                    int nY = (short)HIWORD(lPos);
+                    if (nY < -nLineHeight) continue;
+                    if (nY > nHeight + nLineHeight) break;
+                    
+                    if (nLogicalLine == nLastDrawnLogicalLine) continue;
+                    nLastDrawnLogicalLine = nLogicalLine;
+                    
+                    rcLine.top = nY;
+                    rcLine.bottom = nY + nLineHeight;
+                    
+                    int nLineNum = nLogicalLine + 1;
+                    int nDisplayNum;
+                    
+                    if (g_AppState.bRelativeLineNumbers) {
+                        if (nLogicalLine == nCurrentLogicalLine) {
+                            nDisplayNum = nLineNum;
+                            SetTextColor(hdc, RGB(0, 0, 0));
+                        } else {
+                            nDisplayNum = abs(nLogicalLine - nCurrentLogicalLine);
+                            SetTextColor(hdc, RGB(100, 100, 100));
+                        }
                     } else {
-                        nDisplayNum = abs(nLogicalLine - nCurrentLogicalLine);
-                        SetTextColor(hdc, RGB(100, 100, 100)); /* Gray for relative */
+                        nDisplayNum = nLineNum;
                     }
-                } else {
-                    nDisplayNum = nLineNum;
+                    
+                    _sntprintf(szLineNum, 16, TEXT("%d"), nDisplayNum);
+                    DrawText(hdc, szLineNum, -1, &rcLine, DT_RIGHT | DT_TOP | DT_SINGLELINE);
                 }
-                
-                _sntprintf(szLineNum, 16, TEXT("%d"), nDisplayNum);
-                DrawText(hdc, szLineNum, -1, &rcLine, DT_RIGHT | DT_TOP | DT_SINGLELINE);
             }
             
             if (hOldFont) {

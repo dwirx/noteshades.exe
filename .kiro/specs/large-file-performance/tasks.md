@@ -221,9 +221,17 @@
     - _Requirements: 4.3_
   - [x] 12.2 Optimize RichEdit rendering for large content
     - Disable redraw during bulk operations
-
     - Use WM_SETREDRAW FALSE/TRUE pattern
     - _Requirements: 4.1_
+  - [x] 12.3 Add line count based debouncing threshold
+    - Enable debouncing for files with >5000 lines regardless of file size
+    - Add LINE_COUNT_DEBOUNCE_THRESHOLD constant
+    - _Requirements: 4.4_
+  - [x] 12.4 Implement simplified line number rendering for large files
+    - Use calculated Y positions instead of EM_POSFROMCHAR for files >10000 lines
+    - Skip word-wrap detection for performance
+    - Reduce SendMessage calls per scroll event
+    - _Requirements: 4.6, 4.7_
 
 - [x] 13. Final integration and cleanup
   - [x] 13.1 Update UpdateWindowTitle for all file modes
