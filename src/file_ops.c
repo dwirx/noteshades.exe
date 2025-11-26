@@ -107,6 +107,52 @@ static BOOL HasUtf8Bom(const char* pBuffer, DWORD dwSize) {
     return FALSE;
 }
 
+/* Check if file is an Excel file (.xls, .xlsx) */
+static BOOL IsExcelFile(const TCHAR* szFilePath) {
+    const TCHAR* pExt = _tcsrchr(szFilePath, TEXT('.'));
+    if (!pExt) return FALSE;
+    
+    TCHAR szExt[16] = {0};
+    _tcsncpy(szExt, pExt, 15);
+    _tcslwr(szExt);
+    
+    return (_tcscmp(szExt, TEXT(".xls")) == 0 || 
+            _tcscmp(szExt, TEXT(".xlsx")) == 0 ||
+            _tcscmp(szExt, TEXT(".xlsm")) == 0 ||
+            _tcscmp(szExt, TEXT(".xlsb")) == 0);
+}
+
+/* Check if file is a CSV file */
+static BOOL IsCSVFile(const TCHAR* szFilePath) {
+    const TCHAR* pExt = _tcsrchr(szFilePath, TEXT('.'));
+    if (!pExt) return FALSE;
+    
+    TCHAR szExt[16] = {0};
+    _tcsncpy(szExt, pExt, 15);
+    _tcslwr(szExt);
+    
+    return (_tcscmp(szExt, TEXT(".csv")) == 0 ||
+            _tcscmp(szExt, TEXT(".tsv")) == 0);
+}
+
+/* Show warning for Excel files */
+static BOOL ShowExcelWarning(HWND hwnd, const TCHAR* szFileName) {
+    TCHAR szMessage[512];
+    _sntprintf(szMessage, 512,
+        TEXT("File Excel Terdeteksi\n\n")
+        TEXT("File '%s' adalah file Excel binary.\n\n")
+        TEXT("XNote adalah text editor dan tidak dapat membaca format Excel dengan benar.\n\n")
+        TEXT("Untuk membuka file Excel, gunakan:\n")
+        TEXT("• Microsoft Excel\n")
+        TEXT("• LibreOffice Calc\n")
+        TEXT("• Google Sheets\n\n")
+        TEXT("Apakah Anda tetap ingin membuka file ini sebagai raw text?"),
+        _tcsrchr(szFileName, TEXT('\\')) ? _tcsrchr(szFileName, TEXT('\\')) + 1 : szFileName);
+    
+    return MessageBox(hwnd, szMessage, TEXT("Format Tidak Didukung"), 
+                     MB_YESNO | MB_ICONWARNING) == IDYES;
+}
+
 /* Check if file extension is a known binary/non-text format */
 static BOOL IsKnownBinaryExtension(const TCHAR* szFilePath) {
     const TCHAR* pExt = _tcsrchr(szFilePath, TEXT('.'));
@@ -435,11 +481,15 @@ static DWORD WINAPI FileLoadThreadProc(LPVOID lpParam) {
         return 1;
     }
 
-    /* Read file in chunks - use smaller chunks for better responsiveness */
+    /* Read file in chunks - adaptive chunk size for optimal performance */
+    /* Use larger chunks for small files, smaller for large files */
     DWORD dwChunkRead;
+    DWORD dwOptimalChunk = (pData->dwFileSize < 512 * 1024) ? 
+                           pData->dwFileSize :  /* Small file: read all at once */
+                           THREAD_CHUNK_SIZE;   /* Large file: use small chunks */
 
     while (pData->dwBytesRead < pData->dwFileSize && !pData->bCancelled) {
-        DWORD dwToRead = min(THREAD_CHUNK_SIZE, pData->dwFileSize - pData->dwBytesRead);
+        DWORD dwToRead = min(dwOptimalChunk, pData->dwFileSize - pData->dwBytesRead);
 
         if (!ReadFile(hFile, pBuffer + pData->dwBytesRead, dwToRead, &dwChunkRead, NULL)) {
             HeapFree(GetProcessHeap(), 0, pBuffer);
@@ -453,7 +503,11 @@ static DWORD WINAPI FileLoadThreadProc(LPVOID lpParam) {
         pData->dwProgress = (pData->dwBytesRead * 100) / pData->dwFileSize;
 
         if (dwChunkRead == 0) break;
-        Sleep(1); /* Small delay to allow UI updates */
+        
+        /* Only sleep for large files to allow UI updates */
+        if (pData->dwFileSize > 512 * 1024) {
+            Sleep(0); /* Yield to other threads without delay */
+        }
     }
 
     CloseHandle(hFile);
@@ -1240,6 +1294,14 @@ BOOL FileOpen(HWND hwnd) {
         return FALSE;
     }
     
+    /* Check for Excel files and show warning */
+    if (IsExcelFile(szFileName)) {
+        if (!ShowExcelWarning(hwnd, szFileName)) {
+            return FALSE; /* User cancelled */
+        }
+        /* User wants to open as raw text - continue */
+    }
+    
     /* Get current tab */
     pTab = GetCurrentTabState();
     
@@ -1256,8 +1318,12 @@ BOOL FileOpen(HWND hwnd) {
         return FALSE;
     }
     
-    /* Show loading status for user feedback */
-    SetWindowText(g_AppState.hwndStatus, TEXT("Loading file..."));
+    /* Show loading status with file type info */
+    if (IsCSVFile(szFileName)) {
+        SetWindowText(g_AppState.hwndStatus, TEXT("Loading CSV file..."));
+    } else {
+        SetWindowText(g_AppState.hwndStatus, TEXT("Loading file..."));
+    }
 
     /* Read file content */
     if (!ReadFileContent(hwndEdit, szFileName)) {

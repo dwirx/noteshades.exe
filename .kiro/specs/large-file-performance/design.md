@@ -58,18 +58,22 @@ flowchart TB
 
 ```mermaid
 flowchart TD
-    Start[Open File Request] --> GetSize[Get File Size]
-    GetSize --> Check1{Size < 50MB?}
+    Start[Open File Request] --> CheckExcel{Excel File?}
+    CheckExcel -->|Yes| ShowWarning[Show Warning Dialog]
+    ShowWarning -->|Cancel| End[Cancel Open]
+    ShowWarning -->|Continue| GetSize
+    CheckExcel -->|No| GetSize[Get File Size]
+    GetSize --> Check1{Size < 2MB?}
     Check1 -->|Yes| Normal[FILEMODE_NORMAL<br/>Full Load]
-    Check1 -->|No| Check2{Size < 200MB?}
+    Check1 -->|No| Check2{Size < 10MB?}
     Check2 -->|Yes| Partial[FILEMODE_PARTIAL<br/>Chunked Load]
-    Check2 -->|No| Check3{Size < 1GB?}
+    Check2 -->|No| Check3{Size < 50MB?}
     Check3 -->|Yes| ReadOnly[FILEMODE_READONLY<br/>Preview Only]
     Check3 -->|No| MMap[FILEMODE_MMAP<br/>Memory Mapped]
     
     Normal --> LoadFull[Load Entire File]
-    Partial --> LoadChunk[Load First 20MB]
-    ReadOnly --> LoadPreview[Load First 10MB]
+    Partial --> LoadChunk[Load First 512KB]
+    ReadOnly --> LoadPreview[Load First 512KB]
     MMap --> CreateMapping[Create File Mapping]
 ```
 
