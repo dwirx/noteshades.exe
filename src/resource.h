@@ -44,8 +44,10 @@
 #define IDC_LINENUMBERS     404
 
 /* Tab menu command IDs */
-#define IDM_FILE_NEWTAB     106
-#define IDM_FILE_CLOSETAB   107
+#define IDM_FILE_NEWTAB      106
+#define IDM_FILE_CLOSETAB    107
+#define IDM_FILE_CLOSEALL    119
+#define IDM_FILE_CLOSEOTHERS 120
 
 /* Menu resource ID */
 #define IDR_MAINMENU        1000

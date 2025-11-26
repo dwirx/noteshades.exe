@@ -113,11 +113,14 @@ static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
     return CallWindowProc(g_OrigEditProc, hwnd, msg, wParam, lParam);
 }
 
-/* Tab control height */
-#define TAB_HEIGHT 28
+/* Tab control height - increased for better visual appearance */
+#define TAB_HEIGHT 32
 
 /* Close button size */
 #define CLOSE_BTN_SIZE 16
+
+/* Tab padding for better spacing */
+#define TAB_PADDING 8
 
 /* Hover tracking for close button */
 static int g_nHoverTab = -1;
@@ -398,10 +401,169 @@ void CloseTab(HWND hwnd, int nTabIndex) {
         AddNewTab(hwnd, TEXT("Untitled"));
     } else {
         /* Switch to appropriate tab */
-        int nNewCurrent = (nTabIndex >= g_AppState.nTabCount) ? 
+        int nNewCurrent = (nTabIndex >= g_AppState.nTabCount) ?
                           g_AppState.nTabCount - 1 : nTabIndex;
         SwitchToTab(hwnd, nNewCurrent);
     }
+}
+
+/* Close all tabs */
+void CloseAllTabs(HWND hwnd) {
+    /* Check for any unsaved changes in all tabs */
+    for (int i = 0; i < g_AppState.nTabCount; i++) {
+        if (g_AppState.tabs[i].bModified) {
+            /* Switch to the modified tab to show it to user */
+            SwitchToTab(hwnd, i);
+
+            /* Ask user what to do */
+            int result = MessageBox(hwnd,
+                TEXT("You have unsaved changes in one or more tabs.\n\nDo you want to save all changes before closing?"),
+                TEXT("Unsaved Changes"),
+                MB_YESNOCANCEL | MB_ICONWARNING);
+
+            if (result == IDCANCEL) {
+                return; /* User cancelled */
+            } else if (result == IDYES) {
+                /* Save all modified tabs */
+                for (int j = 0; j < g_AppState.nTabCount; j++) {
+                    if (g_AppState.tabs[j].bModified) {
+                        SwitchToTab(hwnd, j);
+                        if (!FileSave(hwnd)) {
+                            /* If save failed, ask if user wants to continue */
+                            if (MessageBox(hwnd,
+                                TEXT("Failed to save file. Continue closing?"),
+                                TEXT("Save Failed"),
+                                MB_YESNO | MB_ICONERROR) != IDYES) {
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+            /* If IDNO, close without saving */
+            break;
+        }
+    }
+
+    /* Close all tabs from back to front */
+    while (g_AppState.nTabCount > 1) {
+        /* Destroy edit control */
+        if (g_AppState.tabs[g_AppState.nTabCount - 1].hwndEdit) {
+            DestroyWindow(g_AppState.tabs[g_AppState.nTabCount - 1].hwndEdit);
+        }
+
+        /* Destroy line number window */
+        if (g_AppState.tabs[g_AppState.nTabCount - 1].lineNumState.hwndLineNumbers) {
+            DestroyWindow(g_AppState.tabs[g_AppState.nTabCount - 1].lineNumState.hwndLineNumbers);
+        }
+
+        /* Free content buffer if allocated */
+        if (g_AppState.tabs[g_AppState.nTabCount - 1].pContent) {
+            HeapFree(GetProcessHeap(), 0, g_AppState.tabs[g_AppState.nTabCount - 1].pContent);
+            g_AppState.tabs[g_AppState.nTabCount - 1].pContent = NULL;
+        }
+
+        /* Remove tab from tab control */
+        TabCtrl_DeleteItem(g_AppState.hwndTab, g_AppState.nTabCount - 1);
+        g_AppState.nTabCount--;
+    }
+
+    /* Reset the last remaining tab to untitled */
+    TabState* pLastTab = &g_AppState.tabs[0];
+    if (pLastTab->hwndEdit) {
+        SetWindowText(pLastTab->hwndEdit, TEXT(""));
+    }
+    pLastTab->szFileName[0] = TEXT('\0');
+    pLastTab->bUntitled = TRUE;
+    pLastTab->bModified = FALSE;
+    pLastTab->language = LANG_NONE;
+
+    /* Update tab title */
+    UpdateTabTitle(0);
+    SwitchToTab(hwnd, 0);
+    MarkSessionDirty();
+}
+
+/* Close all tabs except the current one */
+void CloseOtherTabs(HWND hwnd, int nKeepTab) {
+    if (nKeepTab < 0 || nKeepTab >= g_AppState.nTabCount) return;
+    if (g_AppState.nTabCount <= 1) return; /* Only one tab, nothing to close */
+
+    /* Check for unsaved changes in other tabs */
+    BOOL bHasUnsaved = FALSE;
+    for (int i = 0; i < g_AppState.nTabCount; i++) {
+        if (i != nKeepTab && g_AppState.tabs[i].bModified) {
+            bHasUnsaved = TRUE;
+            break;
+        }
+    }
+
+    if (bHasUnsaved) {
+        int result = MessageBox(hwnd,
+            TEXT("Some tabs have unsaved changes.\n\nDo you want to save all changes before closing?"),
+            TEXT("Unsaved Changes"),
+            MB_YESNOCANCEL | MB_ICONWARNING);
+
+        if (result == IDCANCEL) {
+            return; /* User cancelled */
+        } else if (result == IDYES) {
+            /* Save all modified tabs except the one we're keeping */
+            for (int i = 0; i < g_AppState.nTabCount; i++) {
+                if (i != nKeepTab && g_AppState.tabs[i].bModified) {
+                    SwitchToTab(hwnd, i);
+                    if (!FileSave(hwnd)) {
+                        if (MessageBox(hwnd,
+                            TEXT("Failed to save file. Continue closing?"),
+                            TEXT("Save Failed"),
+                            MB_YESNO | MB_ICONERROR) != IDYES) {
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /* Close all tabs after the kept tab */
+    while (g_AppState.nTabCount > nKeepTab + 1) {
+        int idx = g_AppState.nTabCount - 1;
+        if (g_AppState.tabs[idx].hwndEdit) {
+            DestroyWindow(g_AppState.tabs[idx].hwndEdit);
+        }
+        if (g_AppState.tabs[idx].lineNumState.hwndLineNumbers) {
+            DestroyWindow(g_AppState.tabs[idx].lineNumState.hwndLineNumbers);
+        }
+        if (g_AppState.tabs[idx].pContent) {
+            HeapFree(GetProcessHeap(), 0, g_AppState.tabs[idx].pContent);
+        }
+        TabCtrl_DeleteItem(g_AppState.hwndTab, idx);
+        g_AppState.nTabCount--;
+    }
+
+    /* Close all tabs before the kept tab */
+    while (nKeepTab > 0) {
+        if (g_AppState.tabs[0].hwndEdit) {
+            DestroyWindow(g_AppState.tabs[0].hwndEdit);
+        }
+        if (g_AppState.tabs[0].lineNumState.hwndLineNumbers) {
+            DestroyWindow(g_AppState.tabs[0].lineNumState.hwndLineNumbers);
+        }
+        if (g_AppState.tabs[0].pContent) {
+            HeapFree(GetProcessHeap(), 0, g_AppState.tabs[0].pContent);
+        }
+        TabCtrl_DeleteItem(g_AppState.hwndTab, 0);
+
+        /* Shift all tabs down */
+        for (int i = 0; i < g_AppState.nTabCount - 1; i++) {
+            g_AppState.tabs[i] = g_AppState.tabs[i + 1];
+        }
+        g_AppState.nTabCount--;
+        nKeepTab--; /* Adjust index since we shifted */
+    }
+
+    /* Switch to the kept tab (now at index 0) */
+    SwitchToTab(hwnd, 0);
+    MarkSessionDirty();
 }
 
 /* Switch to a specific tab - optimized for performance */
@@ -596,7 +758,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             /* Set tab item size - wide enough for long filenames with extension + close button */
             /* TCM_SETITEMSIZE with TCS_FIXEDWIDTH ensures fixed width tabs */
             /* Width: 200px should be enough for most filenames with smaller font */
-            SendMessage(g_AppState.hwndTab, TCM_SETITEMSIZE, 0, MAKELPARAM(200, TAB_HEIGHT - 4));
+            /* Height: Slightly smaller than TAB_HEIGHT for better visual appearance */
+            SendMessage(g_AppState.hwndTab, TCM_SETITEMSIZE, 0, MAKELPARAM(200, TAB_HEIGHT - 6));
             
             /* Initialize theme system */
             InitTheme();
@@ -741,18 +904,29 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 tci.cchTextMax = MAX_PATH;
                 TabCtrl_GetItem(g_AppState.hwndTab, pDIS->itemID, &tci);
                 
+                /* Draw active tab indicator line (top border) */
+                if (bSelected) {
+                    RECT rcIndicator = rc;
+                    rcIndicator.bottom = rcIndicator.top + 3;
+                    HBRUSH hIndicatorBrush = CreateSolidBrush(pTheme->crKeyword); /* Use accent color */
+                    FillRect(pDIS->hDC, &rcIndicator, hIndicatorBrush);
+                    DeleteObject(hIndicatorBrush);
+                }
+
                 /* Select tab font for drawing (smaller than edit font) */
                 HFONT hOldFont = (HFONT)SelectObject(pDIS->hDC, g_hTabFont ? g_hTabFont : g_hFont);
-                
-                /* Calculate text area - minimal margins to maximize text space */
+
+                /* Calculate text area - better padding for improved spacing */
                 RECT rcText = rc;
-                rcText.left += 4;
-                rcText.right -= CLOSE_BTN_SIZE + 2;
-                
-                /* Draw text with theme color */
+                rcText.left += TAB_PADDING;
+                rcText.right -= (CLOSE_BTN_SIZE + TAB_PADDING + 4);
+                rcText.top += 1; /* Slight vertical adjustment for better centering */
+
+                /* Draw text with theme color - make active tab text brighter */
                 SetBkMode(pDIS->hDC, TRANSPARENT);
-                SetTextColor(pDIS->hDC, pTheme->crTabText);
-                DrawText(pDIS->hDC, szText, -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+                COLORREF textColor = bSelected ? pTheme->crForeground : pTheme->crTabText;
+                SetTextColor(pDIS->hDC, textColor);
+                DrawText(pDIS->hDC, szText, -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
                 
                 /* Restore font */
                 SelectObject(pDIS->hDC, hOldFont);
@@ -847,6 +1021,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     break;
                 case IDM_FILE_CLOSETAB:
                     CloseTab(hwnd, g_AppState.nCurrentTab);
+                    break;
+                case IDM_FILE_CLOSEALL:
+                    CloseAllTabs(hwnd);
+                    break;
+                case IDM_FILE_CLOSEOTHERS:
+                    CloseOtherTabs(hwnd, g_AppState.nCurrentTab);
                     break;
                 case IDM_FILE_EXIT:
                     SendMessage(hwnd, WM_CLOSE, 0, 0);

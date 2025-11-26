@@ -162,6 +162,8 @@ void RecreateEditControl(HWND hwnd, int nTabIndex, BOOL bWordWrap);
 /* Tab operations */
 int AddNewTab(HWND hwnd, const TCHAR* szTitle);
 void CloseTab(HWND hwnd, int nTabIndex);
+void CloseAllTabs(HWND hwnd);
+void CloseOtherTabs(HWND hwnd, int nKeepTab);
 void SwitchToTab(HWND hwnd, int nTabIndex);
 void UpdateTabTitle(int nTabIndex);
 HWND GetCurrentEdit(void);

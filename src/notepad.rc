@@ -10,10 +10,12 @@ IDI_APPICON ICON "icons/xnote.ico"
 #define IDM_FILE_SAVE       103
 #define IDM_FILE_SAVEAS     104
 #define IDM_FILE_EXIT       105
-#define IDM_FILE_NEWTAB     106
-#define IDM_FILE_CLOSETAB   107
-#define IDM_TAB_NEXT        108
-#define IDM_TAB_PREV        109
+#define IDM_FILE_NEWTAB      106
+#define IDM_FILE_CLOSETAB    107
+#define IDM_TAB_NEXT         108
+#define IDM_TAB_PREV         109
+#define IDM_FILE_CLOSEALL    119
+#define IDM_FILE_CLOSEOTHERS 120
 #define IDM_TAB_1           110
 #define IDM_TAB_2           111
 #define IDM_TAB_3           112
@@ -77,6 +79,9 @@ BEGIN
         MENUITEM "Save &As...\tCtrl+Shift+S", IDM_FILE_SAVEAS
         MENUITEM SEPARATOR
         MENUITEM "&Close Tab\tCtrl+W",      IDM_FILE_CLOSETAB
+        MENUITEM "Close &All Tabs",         IDM_FILE_CLOSEALL
+        MENUITEM "Close &Other Tabs",       IDM_FILE_CLOSEOTHERS
+        MENUITEM SEPARATOR
         MENUITEM "Next Tab\tCtrl+Tab",      IDM_TAB_NEXT
         MENUITEM "Previous Tab\tCtrl+Shift+Tab", IDM_TAB_PREV
         MENUITEM SEPARATOR
