@@ -9,6 +9,22 @@ static const TCHAR szLineNumClassName[] = TEXT("LineNumberWindow");
 #define DEFAULT_LINE_NUM_WIDTH 35
 #define LINE_NUM_PADDING 4
 
+/* OPTIMIZATION: Cache for scroll position to skip redundant repaints */
+static int g_nLastFirstVisible = -1;
+static int g_nLastTotalLines = -1;
+static int g_nLastCurrentLine = -1;
+
+/* OPTIMIZATION: Cached GDI objects to reduce creation overhead */
+static HBRUSH g_hCachedBgBrush = NULL;
+static COLORREF g_crCachedBgColor = 0;
+
+/* Reset line number cache (call when switching tabs or loading new file) */
+void ResetLineNumberCache(void) {
+    g_nLastFirstVisible = -1;
+    g_nLastTotalLines = -1;
+    g_nLastCurrentLine = -1;
+}
+
 
 
 /* Register line number window class */
@@ -146,20 +162,21 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             HBITMAP hBitmap = CreateCompatibleBitmap(hdcScreen, nWidth, nHeight);
             HBITMAP hOldBitmap = (HBITMAP)SelectObject(hdc, hBitmap);
             
-            /* Fill background with theme color */
+            /* Fill background with theme color - use cached brush for performance */
             const ThemeColors* pTheme = GetThemeColors();
-            HBRUSH hBrush = CreateSolidBrush(pTheme->crLineNumBg);
-            FillRect(hdc, &rcClient, hBrush);
-            DeleteObject(hBrush);
+            if (g_crCachedBgColor != pTheme->crLineNumBg || !g_hCachedBgBrush) {
+                if (g_hCachedBgBrush) DeleteObject(g_hCachedBgBrush);
+                g_hCachedBgBrush = CreateSolidBrush(pTheme->crLineNumBg);
+                g_crCachedBgColor = pTheme->crLineNumBg;
+            }
+            FillRect(hdc, &rcClient, g_hCachedBgBrush);
             
-            /* Draw thin separator line on right edge */
-            COLORREF crSeparator = pTheme->crLineNumber;
-            HPEN hPen = CreatePen(PS_SOLID, 1, crSeparator);
-            HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
+            /* Draw thin separator line on right edge - use stock pen when possible */
+            HPEN hOldPen = (HPEN)SelectObject(hdc, GetStockObject(DC_PEN));
+            SetDCPenColor(hdc, pTheme->crLineNumber);
             MoveToEx(hdc, rcClient.right - 1, rcClient.top, NULL);
             LineTo(hdc, rcClient.right - 1, rcClient.bottom);
             SelectObject(hdc, hOldPen);
-            DeleteObject(hPen);
             
             /* Use the SAME font as edit control for proper alignment */
             HFONT hEditFont = (HFONT)SendMessage(hwndEdit, WM_GETFONT, 0, 0);
@@ -358,10 +375,33 @@ void UpdateLineNumbers(HWND hwndLineNumbers, HWND hwndEdit) {
     InvalidateRect(hwndLineNumbers, NULL, TRUE);
 }
 
-/* Sync line number scroll with edit control */
+/* Sync line number scroll with edit control - OPTIMIZED with cache check */
 void SyncLineNumberScroll(HWND hwndLineNumbers, HWND hwndEdit) {
-    (void)hwndEdit; /* Unused - we get edit from GetCurrentEdit() */
     if (!hwndLineNumbers || !IsWindowVisible(hwndLineNumbers)) return;
+    
+    /* OPTIMIZATION: Check if scroll position actually changed */
+    HWND hEdit = hwndEdit ? hwndEdit : GetCurrentEdit();
+    if (hEdit) {
+        int nFirstVisible = (int)SendMessage(hEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
+        
+        /* For relative line numbers, also check cursor position */
+        int nCurrentLine = -1;
+        if (g_AppState.bRelativeLineNumbers) {
+            DWORD dwCursorPos = 0;
+            SendMessage(hEdit, EM_GETSEL, (WPARAM)&dwCursorPos, 0);
+            nCurrentLine = (int)SendMessage(hEdit, EM_LINEFROMCHAR, dwCursorPos, 0);
+        }
+        
+        /* Skip repaint if nothing changed */
+        if (nFirstVisible == g_nLastFirstVisible && 
+            nCurrentLine == g_nLastCurrentLine) {
+            return; /* No change - skip expensive repaint */
+        }
+        
+        /* Update cache */
+        g_nLastFirstVisible = nFirstVisible;
+        g_nLastCurrentLine = nCurrentLine;
+    }
     
     /* Invalidate without erasing background for smoother redraw */
     InvalidateRect(hwndLineNumbers, NULL, FALSE);

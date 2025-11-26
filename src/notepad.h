@@ -216,6 +216,7 @@ void UpdateLineNumbers(HWND hwndLineNumbers, HWND hwndEdit);
 void ToggleLineNumbers(HWND hwnd);
 void ToggleRelativeLineNumbers(HWND hwnd);
 void SyncLineNumberScroll(HWND hwndLineNumbers, HWND hwndEdit);
+void ResetLineNumberCache(void);  /* Reset cache when switching tabs */
 int CalculateLineNumberWidth(int nLineCount);
 LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 void RepositionControls(HWND hwnd);

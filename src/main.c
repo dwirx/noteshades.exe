@@ -120,12 +120,32 @@ static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             /* Call original proc first */
             LRESULT result = CallWindowProc(g_OrigEditProc, hwnd, msg, wParam, lParam);
             
-            /* Sync line numbers for navigation keys */
+            /* Sync line numbers for navigation keys - with debouncing for large files */
             if (wParam == VK_UP || wParam == VK_DOWN || wParam == VK_PRIOR || 
                 wParam == VK_NEXT || wParam == VK_HOME || wParam == VK_END) {
                 TabState* pTab = GetCurrentTabState();
                 if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
-                    SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+                    /* Check if debouncing needed for large files */
+                    int nLineCount = (int)SendMessage(hwnd, EM_GETLINECOUNT, 0, 0);
+                    BOOL bNeedsDebouncing = (pTab->dwTotalFileSize > THRESHOLD_PARTIAL) || 
+                                            (nLineCount > LINE_COUNT_DEBOUNCE_THRESHOLD);
+                    
+                    if (bNeedsDebouncing && (wParam == VK_UP || wParam == VK_DOWN)) {
+                        /* For rapid up/down keys, use debouncing */
+                        DWORD dwNow = GetTickCount();
+                        if (dwNow - g_dwLastScrollTime < SCROLL_DEBOUNCE_MS) {
+                            if (!g_bScrollPending) {
+                                SetTimer(hwnd, TIMER_SCROLL_DEBOUNCE, SCROLL_DEBOUNCE_MS, NULL);
+                                g_bScrollPending = TRUE;
+                            }
+                        } else {
+                            g_dwLastScrollTime = dwNow;
+                            SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+                        }
+                    } else {
+                        /* Small file or page keys - sync immediately */
+                        SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+                    }
                 }
             }
             return result;
@@ -651,6 +671,9 @@ void SwitchToTab(HWND hwnd, int nTabIndex) {
         IsWindowVisible(g_AppState.tabs[nTabIndex].hwndEdit)) {
         return;
     }
+    
+    /* Reset line number cache when switching tabs for accurate rendering */
+    ResetLineNumberCache();
     
     /* Disable redraw during switch for smoother transition */
     SendMessage(hwnd, WM_SETREDRAW, FALSE, 0);

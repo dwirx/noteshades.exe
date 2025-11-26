@@ -232,6 +232,18 @@
     - Skip word-wrap detection for performance
     - Reduce SendMessage calls per scroll event
     - _Requirements: 4.6, 4.7_
+  - [x] 12.5 Implement scroll position caching
+    - Cache last scroll position to skip redundant repaints
+    - Reset cache on tab switch
+    - _Requirements: 4.1_
+  - [x] 12.6 Optimize GDI object creation
+    - Cache background brush for line numbers
+    - Use stock DC_PEN instead of creating new pen
+    - _Requirements: 4.1_
+  - [x] 12.7 Add keyboard navigation debouncing
+    - Apply debouncing to VK_UP/VK_DOWN for large files
+    - Prevent lag during rapid arrow key navigation
+    - _Requirements: 4.3, 4.4_
 
 - [x] 13. Final integration and cleanup
   - [x] 13.1 Update UpdateWindowTitle for all file modes
