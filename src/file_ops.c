@@ -482,11 +482,14 @@ static DWORD WINAPI FileLoadThreadProc(LPVOID lpParam) {
     }
 
     /* Read file in chunks - adaptive chunk size for optimal performance */
-    /* Use larger chunks for small files, smaller for large files */
+    /* Adaptive chunk size based on benchmark results:
+     * - Files < 512KB: read all at once (fastest)
+     * - Files >= 512KB: use 64KB chunks (optimal from benchmark)
+     */
     DWORD dwChunkRead;
-    DWORD dwOptimalChunk = (pData->dwFileSize < 512 * 1024) ? 
+    DWORD dwOptimalChunk = (pData->dwFileSize < SMALL_FILE_THRESHOLD) ? 
                            pData->dwFileSize :  /* Small file: read all at once */
-                           THREAD_CHUNK_SIZE;   /* Large file: use small chunks */
+                           THREAD_CHUNK_SIZE;   /* Large file: use 64KB chunks */
 
     while (pData->dwBytesRead < pData->dwFileSize && !pData->bCancelled) {
         DWORD dwToRead = min(dwOptimalChunk, pData->dwFileSize - pData->dwBytesRead);
@@ -504,8 +507,8 @@ static DWORD WINAPI FileLoadThreadProc(LPVOID lpParam) {
 
         if (dwChunkRead == 0) break;
         
-        /* Only sleep for large files to allow UI updates */
-        if (pData->dwFileSize > 512 * 1024) {
+        /* Only yield for large files to allow UI updates */
+        if (pData->dwFileSize > SMALL_FILE_THRESHOLD) {
             Sleep(0); /* Yield to other threads without delay */
         }
     }

@@ -70,12 +70,13 @@ typedef enum {
 #define THRESHOLD_SYNTAX_OFF    (256 * 1024)            /* 256KB - disable syntax highlighting */
 #define THRESHOLD_LINE_SYNTAX   5000                     /* 5000 lines - disable syntax */
 
-/* Chunk size constants for large file loading */
+/* Chunk size constants for large file loading - OPTIMIZED based on benchmark */
 #define INITIAL_CHUNK_SIZE      (512 * 1024)            /* 512KB initial load for instant display */
 #define LOAD_MORE_CHUNK         (1 * 1024 * 1024)       /* 1MB per F5 press */
 #define PREVIEW_SIZE            (512 * 1024)            /* 512KB preview for read-only */
-#define THREAD_CHUNK_SIZE       (32 * 1024)             /* 32KB read chunks for max responsiveness */
-#define STREAM_CHUNK_SIZE       (16 * 1024)             /* 16KB for streaming to RichEdit */
+#define THREAD_CHUNK_SIZE       (64 * 1024)             /* 64KB read chunks - optimal from benchmark */
+#define STREAM_CHUNK_SIZE       (32 * 1024)             /* 32KB for streaming to RichEdit */
+#define SMALL_FILE_THRESHOLD    (512 * 1024)            /* 512KB - read all at once */
 
 /* Undo buffer limits */
 #define UNDO_LIMIT_LARGE_FILE   100                     /* Max undo operations for large files */

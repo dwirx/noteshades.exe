@@ -8,8 +8,9 @@ static BOOL g_bWholeWord = FALSE;
 static HWND g_hwndFindReplace = NULL;
 
 static const TCHAR szFilter[] = 
-    TEXT("All Supported Files\0*.txt;*.md;*.json;*.xml;*.html;*.htm;*.css;*.js;*.ts;*.py;*.c;*.cpp;*.h;*.hpp;*.java;*.go;*.rs;*.sql;*.yaml;*.yml;*.sh;*.bat;*.ps1;*.php;*.rb;*.log;*.ini;*.cfg;*.conf\0")
+    TEXT("All Supported Files\0*.txt;*.md;*.json;*.xml;*.html;*.htm;*.css;*.js;*.ts;*.py;*.c;*.cpp;*.h;*.hpp;*.java;*.go;*.rs;*.sql;*.yaml;*.yml;*.sh;*.bat;*.ps1;*.php;*.rb;*.log;*.ini;*.cfg;*.conf;*.csv;*.tsv\0")
     TEXT("Text Files (*.txt)\0*.txt\0")
+    TEXT("CSV/TSV Data (*.csv, *.tsv)\0*.csv;*.tsv\0")
     TEXT("Markdown (*.md)\0*.md\0")
     TEXT("JSON (*.json)\0*.json\0")
     TEXT("XML (*.xml)\0*.xml\0")
