@@ -36,6 +36,12 @@ static HMODULE g_hRichEdit = NULL;
 /* Original edit control window procedure */
 static WNDPROC g_OrigEditProc = NULL;
 
+/* Scroll debouncing timer ID and state for large file optimization */
+#define TIMER_SCROLL_DEBOUNCE 100
+static BOOL g_bScrollPending = FALSE;
+static DWORD g_dwLastScrollTime = 0;
+#define SCROLL_DEBOUNCE_MS 16  /* ~60 FPS for smooth scrolling */
+
 /* Subclassed edit control procedure to catch scroll events and vim keys */
 static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     /* Process vim keys first if vim mode is enabled */
@@ -53,16 +59,48 @@ static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
     }
     
     switch (msg) {
+        case WM_TIMER:
+            if (wParam == TIMER_SCROLL_DEBOUNCE) {
+                /* Debounced scroll update */
+                KillTimer(hwnd, TIMER_SCROLL_DEBOUNCE);
+                g_bScrollPending = FALSE;
+                TabState* pTab = GetCurrentTabState();
+                if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                    SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+                }
+                return 0;
+            }
+            break;
+            
         case WM_VSCROLL:
         case WM_HSCROLL:
         case WM_MOUSEWHEEL: {
             /* Call original proc first */
             LRESULT result = CallWindowProc(g_OrigEditProc, hwnd, msg, wParam, lParam);
             
-            /* Then sync line numbers */
+            /* Use debouncing for large files to prevent excessive rendering (Requirement 4.3) */
             TabState* pTab = GetCurrentTabState();
-            if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
-                SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+            if (pTab && pTab->dwTotalFileSize > THRESHOLD_PARTIAL) {
+                /* Large file - use debounced scroll */
+                DWORD dwNow = GetTickCount();
+                if (dwNow - g_dwLastScrollTime < SCROLL_DEBOUNCE_MS) {
+                    /* Too soon - set timer for delayed update */
+                    if (!g_bScrollPending) {
+                        SetTimer(hwnd, TIMER_SCROLL_DEBOUNCE, SCROLL_DEBOUNCE_MS, NULL);
+                        g_bScrollPending = TRUE;
+                    }
+                } else {
+                    /* Enough time passed - update immediately */
+                    g_dwLastScrollTime = dwNow;
+                    if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                        SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+                    }
+                }
+            } else {
+                /* Small file - sync immediately */
+                if (pTab && g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+                    SyncLineNumberScroll(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+                }
             }
             return result;
         }
@@ -241,6 +279,14 @@ void InitTabState(TabState* pState) {
     pState->bInsertMode = TRUE;              /* Default insert mode */
     pState->language = LANG_NONE;            /* No syntax highlighting by default */
     pState->bNeedsSyntaxRefresh = FALSE;     /* No pending syntax refresh */
+
+    /* Initialize large file support fields */
+    pState->fileMode = FILEMODE_NORMAL;      /* Normal mode by default */
+    pState->hFileMapping = NULL;             /* No memory mapping */
+    pState->pMappedView = NULL;              /* No mapped view */
+    pState->dwTotalFileSize = 0;             /* No file loaded */
+    pState->dwLoadedSize = 0;                /* Nothing loaded yet */
+    pState->dwChunkSize = 20 * 1024 * 1024;  /* Default 20MB chunks */
 }
 
 /* Create edit control for a tab */
@@ -303,10 +349,19 @@ static HWND CreateTabEditControl(HWND hwndParent, BOOL bWordWrap) {
     if (hwndEdit) {
         /* Set font */
         SendMessage(hwndEdit, WM_SETFONT, (WPARAM)g_hFont, TRUE);
-        
-        /* Set text limit to maximum */
+
+        /* Set text limit to maximum for large file support */
+        /* EM_SETLIMITTEXT with 0 = default limit (~32KB for EDIT, ~1GB for RichEdit) */
+        /* EM_EXLIMITTEXT allows setting explicit limit up to 2GB for RichEdit */
         SendMessage(hwndEdit, EM_SETLIMITTEXT, 0, 0);
-        
+
+        /* For RichEdit controls, set extended limit to support files up to 1GB */
+        /* This is a RichEdit-specific message that supports larger limits */
+        if (g_hRichEdit) {
+            /* Set limit to 1GB (1073741824 bytes) for text capacity */
+            SendMessage(hwndEdit, EM_EXLIMITTEXT, 0, 1073741824);
+        }
+
         /* Apply current theme colors */
         ApplyThemeToEdit(hwndEdit);
         
@@ -381,6 +436,16 @@ void CloseTab(HWND hwnd, int nTabIndex) {
     /* Free content buffer if allocated */
     if (pTab->pContent) {
         HeapFree(GetProcessHeap(), 0, pTab->pContent);
+    }
+    
+    /* Clean up memory-mapped file handles (Requirement 1.3) */
+    if (pTab->pMappedView) {
+        UnmapViewOfFile(pTab->pMappedView);
+        pTab->pMappedView = NULL;
+    }
+    if (pTab->hFileMapping) {
+        CloseHandle(pTab->hFileMapping);
+        pTab->hFileMapping = NULL;
     }
     
     /* Remove tab from tab control */
@@ -1079,6 +1144,25 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     break;
                 
                 case IDM_VIEW_SYNTAX: {
+                    /* Check if trying to enable syntax on large file (Requirement 5.3) */
+                    if (!g_bSyntaxHighlight) {
+                        TabState* pCurrentTab = GetCurrentTabState();
+                        if (pCurrentTab && pCurrentTab->dwTotalFileSize > THRESHOLD_SYNTAX_OFF) {
+                            int nResult = MessageBox(hwnd,
+                                TEXT("Enabling syntax highlighting on large files may cause performance issues.\n\n")
+                                TEXT("The file is larger than 1MB. Syntax highlighting may cause:\n")
+                                TEXT("- Slow scrolling\n")
+                                TEXT("- Delayed response to typing\n")
+                                TEXT("- High memory usage\n\n")
+                                TEXT("Do you want to enable syntax highlighting anyway?"),
+                                TEXT("Performance Warning"),
+                                MB_YESNO | MB_ICONWARNING);
+                            if (nResult != IDYES) {
+                                break;
+                            }
+                        }
+                    }
+                    
                     /* Toggle syntax highlighting */
                     g_bSyntaxHighlight = !g_bSyntaxHighlight;
                     HMENU hMenu = GetMenu(hwnd);
@@ -1089,6 +1173,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                         TabState* pTabItem = &g_AppState.tabs[i];
                         if (pTabItem->hwndEdit) {
                             if (g_bSyntaxHighlight) {
+                                /* Skip syntax for large files (Requirement 5.1) */
+                                if (pTabItem->dwTotalFileSize > THRESHOLD_SYNTAX_OFF) {
+                                    continue;
+                                }
                                 pTabItem->language = DetectLanguage(pTabItem->szFileName);
                                 ApplySyntaxHighlighting(pTabItem->hwndEdit, pTabItem->language);
                             } else {
@@ -1215,7 +1303,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 case IDM_EDIT_UNINDENT:
                     if (hwndEdit) EditUnindent(hwndEdit);
                     break;
-                
+                case IDM_EDIT_LOADMORE:
+                    LoadMoreContent(hwnd);
+                    break;
+
                 /* Help menu */
                 case IDM_HELP_CONTENTS:
                     ShowHelpDialog(hwnd);

@@ -41,6 +41,7 @@ IDI_APPICON ICON "icons/xnote.ico"
 #define IDM_EDIT_TOGGLECOMMENT  214
 #define IDM_EDIT_INDENT         215
 #define IDM_EDIT_UNINDENT       216
+#define IDM_EDIT_LOADMORE       217
 #define IDM_HELP_CONTENTS   302
 #define IDM_FORMAT_WORDWRAP 251
 #define IDM_FORMAT_FONT     252
@@ -198,7 +199,8 @@ BEGIN
     VK_UP,  IDM_EDIT_MOVELINEUP,    VIRTKEY, ALT
     VK_DOWN, IDM_EDIT_MOVELINEDOWN, VIRTKEY, ALT
     VK_OEM_2, IDM_EDIT_TOGGLECOMMENT, VIRTKEY, CONTROL  /* Ctrl+/ */
-    
+    VK_F5,  IDM_EDIT_LOADMORE,      VIRTKEY  /* F5 - Load more content for partial files */
+
     /* View operations */
     "L",    IDM_VIEW_LINENUMBERS, VIRTKEY, CONTROL
     "V",    IDM_VIEW_VIMMODE,   VIRTKEY, CONTROL, SHIFT
@@ -227,6 +229,12 @@ END
 #define IDD_GOTOLINE        550
 #define IDC_GOTOLINE_EDIT   551
 #define IDC_GOTOLINE_INFO   552
+
+/* Progress Dialog IDs */
+#define IDD_PROGRESS        650
+#define IDC_PROGRESS_BAR    651
+#define IDC_PROGRESS_TEXT   652
+#define IDC_PROGRESS_CANCEL 653
 
 /* Help Dialog ID */
 #define IDD_HELP            600
@@ -261,6 +269,18 @@ BEGIN
     LTEXT           "",IDC_GOTOLINE_INFO,10,30,180,10
     DEFPUSHBUTTON   "Go",IDOK,85,50,50,14
     PUSHBUTTON      "Cancel",IDCANCEL,140,50,50,14
+END
+
+/* Progress Dialog */
+IDD_PROGRESS DIALOGEX 0, 0, 280, 80
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION
+CAPTION "Loading File"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT           "Loading file...",IDC_PROGRESS_TEXT,10,10,260,10
+    CONTROL         "",IDC_PROGRESS_BAR,"msctls_progress32",WS_BORDER,10,25,260,14
+    LTEXT           "Please wait while the file is being loaded.",1300,10,45,260,10
+    PUSHBUTTON      "Cancel",IDC_PROGRESS_CANCEL,115,60,50,14
 END
 
 /* Help Dialog */

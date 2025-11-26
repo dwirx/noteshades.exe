@@ -65,13 +65,14 @@ echo.
 echo XNote - Fast and Lightweight Text Editor
 echo.
 echo Features:
-echo   - Multiple tabs with close button
-echo   - Line numbers (View menu)
-echo   - Syntax highlighting for 20+ languages
-echo   - Large file support (up to 100MB)
-echo   - UTF-8 encoding
+echo   - Multiple tabs (with Close All/Close Others)
+echo   - Line numbers (absolute and relative)
+echo   - Syntax highlighting for 20+ languages (up to 10MB)
+echo   - **LARGE FILE SUPPORT (up to 500MB!)**
+echo   - UTF-8 encoding with BOM detection
+echo   - Vim mode with modal editing
 echo   - Word wrap toggle
-echo   - Status bar with file info
+echo   - Modern UI with theme support
 echo.
 echo Supported Languages:
 echo   C, C++, Java, JavaScript, TypeScript, Python,

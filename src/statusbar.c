@@ -148,9 +148,19 @@ void UpdateStatusBar(HWND hwnd) {
     
     TCHAR szText[256];
     
-    /* Part 0: File type / Language */
+    /* Part 0: File type / Language / Large file mode info */
     if (pTab) {
-        if (pTab->language != LANG_NONE && g_bSyntaxHighlight) {
+        /* For large files, show mode and loading info (Requirements 3.1, 8.3) */
+        if (pTab->fileMode == FILEMODE_PARTIAL && pTab->dwLoadedSize < pTab->dwTotalFileSize) {
+            _sntprintf(szText, 256, TEXT("Loaded %.1f/%.1f MB - F5 to load more"),
+                       pTab->dwLoadedSize / (1024.0 * 1024.0),
+                       pTab->dwTotalFileSize / (1024.0 * 1024.0));
+            SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_FILETYPE, (LPARAM)szText);
+        } else if (pTab->fileMode == FILEMODE_READONLY || pTab->fileMode == FILEMODE_MMAP) {
+            _sntprintf(szText, 256, TEXT("READ-ONLY (%.1f MB)"),
+                       pTab->dwTotalFileSize / (1024.0 * 1024.0));
+            SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_FILETYPE, (LPARAM)szText);
+        } else if (pTab->language != LANG_NONE && g_bSyntaxHighlight) {
             /* Show detected language */
             const TCHAR* szLang = GetLanguageName(pTab->language);
             SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_FILETYPE, (LPARAM)szLang);

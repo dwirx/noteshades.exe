@@ -100,6 +100,7 @@
 #define IDM_EDIT_TOGGLECOMMENT  214
 #define IDM_EDIT_INDENT         215
 #define IDM_EDIT_UNINDENT       216
+#define IDM_EDIT_LOADMORE       217
 
 /* View extended command IDs */
 #define IDM_VIEW_ZOOMIN     265
@@ -139,5 +140,11 @@
 /* Help dialog ID */
 #define IDD_HELP            600
 #define IDC_HELP_TEXT       601
+
+/* Progress dialog IDs */
+#define IDD_PROGRESS        650
+#define IDC_PROGRESS_BAR    651
+#define IDC_PROGRESS_TEXT   652
+#define IDC_PROGRESS_CANCEL 653
 
 #endif /* RESOURCE_H */

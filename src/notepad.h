@@ -54,6 +54,30 @@ typedef enum {
     LINE_ENDING_CR               /* Mac (CR) */
 } LineEndingType;
 
+/* Large file loading modes */
+typedef enum {
+    FILEMODE_NORMAL = 0,         /* Normal mode - full file loaded (<50MB) */
+    FILEMODE_PARTIAL,            /* Partial mode - chunked loading (50-200MB) */
+    FILEMODE_READONLY,           /* Read-only preview mode (200MB-1GB) */
+    FILEMODE_MMAP                /* Memory-mapped mode (>1GB) */
+} FileModeType;
+
+/* Large file threshold constants - LOWERED for better responsiveness */
+#define THRESHOLD_PARTIAL       (5 * 1024 * 1024)       /* 5MB - switch to partial mode */
+#define THRESHOLD_READONLY      (50 * 1024 * 1024)      /* 50MB - switch to read-only */
+#define THRESHOLD_MMAP          (200 * 1024 * 1024)     /* 200MB - switch to memory-mapped */
+#define THRESHOLD_SYNTAX_OFF    (512 * 1024)            /* 512KB - disable syntax highlighting */
+#define THRESHOLD_PROGRESS      (2 * 1024 * 1024)       /* 2MB - show progress dialog */
+
+/* Chunk size constants for large file loading */
+#define INITIAL_CHUNK_SIZE      (2 * 1024 * 1024)       /* 2MB initial load for fast display */
+#define LOAD_MORE_CHUNK         (5 * 1024 * 1024)       /* 5MB per F5 press */
+#define PREVIEW_SIZE            (2 * 1024 * 1024)       /* 2MB preview for read-only */
+#define THREAD_CHUNK_SIZE       (64 * 1024)             /* 64KB read chunks for responsiveness */
+
+/* Undo buffer limits */
+#define UNDO_LIMIT_LARGE_FILE   100                     /* Max undo operations for large files */
+
 /* Tab/Document state structure */
 typedef struct {
     TCHAR szFileName[MAX_PATH];  /* Full path of current file */
@@ -67,6 +91,14 @@ typedef struct {
     BOOL bInsertMode;            /* Insert/Overwrite mode */
     LanguageType language;       /* Language for syntax highlighting */
     BOOL bNeedsSyntaxRefresh;    /* Flag for lazy syntax refresh after theme change */
+
+    /* Large file support */
+    FileModeType fileMode;       /* File loading mode */
+    HANDLE hFileMapping;         /* Memory-mapped file handle */
+    LPVOID pMappedView;          /* Mapped view pointer */
+    DWORD dwTotalFileSize;       /* Total file size on disk */
+    DWORD dwLoadedSize;          /* Amount currently loaded in editor */
+    DWORD dwChunkSize;           /* Chunk size for partial loading */
 } TabState;
 
 /* Application state structure */
@@ -99,6 +131,12 @@ BOOL FileSave(HWND hwnd);
 BOOL FileSaveAs(HWND hwnd);
 BOOL PromptSaveChanges(HWND hwnd);
 void UpdateWindowTitle(HWND hwnd);
+
+/* Large file operations */
+FileModeType DetectOptimalFileMode(DWORD dwFileSize);
+BOOL LoadFileWithMode(HWND hwnd, const TCHAR* szFileName, FileModeType forcedMode);
+BOOL LoadMoreContent(HWND hwnd);
+void ShowLargeFileInfo(HWND hwnd, DWORD dwFileSize, FileModeType mode);
 
 /* Edit operations */
 void EditUndo(HWND hEdit);

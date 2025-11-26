@@ -94,21 +94,43 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
         case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC hdcScreen = BeginPaint(hwnd, &ps);
-            
+
             /* Get associated edit control from parent's current tab */
             HWND hwndEdit = GetCurrentEdit();
             if (!hwndEdit) {
                 EndPaint(hwnd, &ps);
                 return 0;
             }
-            
+
             /* Get client rect */
             RECT rcClient;
             GetClientRect(hwnd, &rcClient);
             int nWidth = rcClient.right - rcClient.left;
             int nHeight = rcClient.bottom - rcClient.top;
-            
+
             if (nWidth <= 0 || nHeight <= 0) {
+                EndPaint(hwnd, &ps);
+                return 0;
+            }
+
+            /* OPTIMIZATION: For extremely large files (>100k lines),
+             * skip line number rendering to prevent scroll lag.
+             * Line numbers add significant overhead for huge files. */
+            int nTotalLinesQuick = (int)SendMessage(hwndEdit, EM_GETLINECOUNT, 0, 0);
+            if (nTotalLinesQuick > 100000) {
+                /* Just draw background and skip numbering */
+                const ThemeColors* pTheme = GetThemeColors();
+                HBRUSH hBrush = CreateSolidBrush(pTheme->crLineNumBg);
+                FillRect(hdcScreen, &rcClient, hBrush);
+                DeleteObject(hBrush);
+
+                /* Draw message */
+                SetBkMode(hdcScreen, TRANSPARENT);
+                SetTextColor(hdcScreen, pTheme->crLineNumber);
+                TCHAR szMsg[] = TEXT("...");
+                RECT rcMsg = rcClient;
+                DrawText(hdcScreen, szMsg, -1, &rcMsg, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
                 EndPaint(hwnd, &ps);
                 return 0;
             }

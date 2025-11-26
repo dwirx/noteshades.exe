@@ -382,15 +382,19 @@ void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang) {
     int nLen = GetWindowTextLengthW(hwndEdit);
     if (nLen == 0) return;
 
-    /* SKIP syntax highlighting for very large files for performance
+    /* SKIP syntax highlighting for large files for performance
      * Large files cause significant lag due to:
-     * - Full text buffer allocation
-     * - Sequential parsing of entire document
+     * - Full text buffer allocation (nLen * 2 bytes for WCHAR)
+     * - Sequential parsing of entire document character-by-character
      * - Multiple SendMessage calls for coloring ranges
-     * Limit set to 100KB as a reasonable balance between features and performance
+     * - RichEdit control becomes slow with many formatting ranges
+     *
+     * Limit set to 1MB characters (~2MB file size) for optimal performance
+     * This ensures smooth editing even on slower machines.
+     * For larger files, syntax highlighting is disabled automatically.
      */
-    if (nLen > 100000) {
-        return; /* No highlighting for files > 100KB for better performance */
+    if (nLen > 1024 * 1024) {
+        return; /* No highlighting for files > 1MB chars for better performance */
     }
     
     /* Cache theme colors for performance */
