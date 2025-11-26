@@ -1272,16 +1272,39 @@ BOOL FileNew(HWND hwnd) {
         }
     }
     
-    /* Clear edit control */
-    SetWindowText(pTab->hwndEdit, TEXT(""));
+    /* Save the edit control handle BEFORE resetting state */
+    HWND hwndEdit = pTab->hwndEdit;
+    HWND hwndLineNumbers = pTab->lineNumState.hwndLineNumbers;
+    BOOL bShowLineNumbers = pTab->lineNumState.bShowLineNumbers;
+    int nLineNumberWidth = pTab->lineNumState.nLineNumberWidth;
     
-    /* Reset tab state */
+    /* Clear edit control */
+    if (hwndEdit) {
+        SetWindowText(hwndEdit, TEXT(""));
+    }
+    
+    /* Reset tab state - this will set hwndEdit to NULL */
     InitTabState(pTab);
-    pTab->hwndEdit = GetCurrentEdit(); /* Keep the edit control */
+    
+    /* Restore the edit control handle and line number state */
+    pTab->hwndEdit = hwndEdit;
+    pTab->lineNumState.hwndLineNumbers = hwndLineNumbers;
+    pTab->lineNumState.bShowLineNumbers = bShowLineNumbers;
+    pTab->lineNumState.nLineNumberWidth = nLineNumberWidth;
     
     /* Update tab and window title */
     UpdateTabTitle(g_AppState.nCurrentTab);
     UpdateWindowTitle(hwnd);
+    
+    /* Update line numbers if visible */
+    if (g_AppState.bShowLineNumbers && pTab->lineNumState.hwndLineNumbers) {
+        UpdateLineNumbers(pTab->lineNumState.hwndLineNumbers, pTab->hwndEdit);
+    }
+    
+    /* Set focus to edit control */
+    if (pTab->hwndEdit) {
+        SetFocus(pTab->hwndEdit);
+    }
     
     return TRUE;
 }

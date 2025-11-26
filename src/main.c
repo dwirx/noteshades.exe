@@ -417,6 +417,12 @@ int AddNewTab(HWND hwnd, const TCHAR* szTitle) {
     /* Create edit control for this tab */
     g_AppState.tabs[nNewTab].hwndEdit = CreateTabEditControl(hwnd, g_AppState.bWordWrap);
     
+    /* Check if edit control was created successfully */
+    if (!g_AppState.tabs[nNewTab].hwndEdit) {
+        ShowErrorDialog(hwnd, TEXT("Failed to create edit control for new tab."));
+        return -1;
+    }
+    
     /* Create line number window if line numbers are enabled */
     if (g_AppState.bShowLineNumbers) {
         g_AppState.tabs[nNewTab].lineNumState.hwndLineNumbers = CreateLineNumberWindow(hwnd, g_AppState.hInstance);
@@ -678,11 +684,14 @@ void SwitchToTab(HWND hwnd, int nTabIndex) {
     /* Disable redraw during switch for smoother transition */
     SendMessage(hwnd, WM_SETREDRAW, FALSE, 0);
     
-    /* Hide current edit control and line numbers */
+    /* Hide current edit control and line numbers - with NULL checks */
     if (g_AppState.nCurrentTab >= 0 && g_AppState.nCurrentTab < g_AppState.nTabCount) {
-        ShowWindow(g_AppState.tabs[g_AppState.nCurrentTab].hwndEdit, SW_HIDE);
-        if (g_AppState.tabs[g_AppState.nCurrentTab].lineNumState.hwndLineNumbers) {
-            ShowWindow(g_AppState.tabs[g_AppState.nCurrentTab].lineNumState.hwndLineNumbers, SW_HIDE);
+        TabState* pCurrentTab = &g_AppState.tabs[g_AppState.nCurrentTab];
+        if (pCurrentTab->hwndEdit) {
+            ShowWindow(pCurrentTab->hwndEdit, SW_HIDE);
+        }
+        if (pCurrentTab->lineNumState.hwndLineNumbers) {
+            ShowWindow(pCurrentTab->lineNumState.hwndLineNumbers, SW_HIDE);
         }
     }
     
@@ -696,10 +705,17 @@ void SwitchToTab(HWND hwnd, int nTabIndex) {
         if (!pTab->lineNumState.hwndLineNumbers) {
             pTab->lineNumState.hwndLineNumbers = CreateLineNumberWindow(hwnd, g_AppState.hInstance);
             pTab->lineNumState.bShowLineNumbers = TRUE;
-            int nLines = (int)SendMessage(pTab->hwndEdit, EM_GETLINECOUNT, 0, 0);
-            pTab->lineNumState.nLineNumberWidth = CalculateLineNumberWidth(nLines);
+            /* Only get line count if edit control exists */
+            if (pTab->hwndEdit) {
+                int nLines = (int)SendMessage(pTab->hwndEdit, EM_GETLINECOUNT, 0, 0);
+                pTab->lineNumState.nLineNumberWidth = CalculateLineNumberWidth(nLines);
+            } else {
+                pTab->lineNumState.nLineNumberWidth = CalculateLineNumberWidth(1);
+            }
         }
-        ShowWindow(pTab->lineNumState.hwndLineNumbers, SW_SHOW);
+        if (pTab->lineNumState.hwndLineNumbers) {
+            ShowWindow(pTab->lineNumState.hwndLineNumbers, SW_SHOW);
+        }
     }
     
     /* Show edit control */
@@ -1509,13 +1525,122 @@ void RecreateEditControl(HWND hwnd, int nTabIndex, BOOL bWordWrap) {
     }
 }
 
+/* Global variable to store command line file path */
+static TCHAR g_szCmdLineFile[MAX_PATH] = {0};
+
+/* Parse command line arguments to extract file path */
+static void ParseCommandLine(LPSTR lpCmdLine) {
+    if (!lpCmdLine || lpCmdLine[0] == '\0') {
+        g_szCmdLineFile[0] = TEXT('\0');
+        return;
+    }
+    
+    /* Skip leading whitespace */
+    while (*lpCmdLine == ' ' || *lpCmdLine == '\t') {
+        lpCmdLine++;
+    }
+    
+    if (*lpCmdLine == '\0') {
+        g_szCmdLineFile[0] = TEXT('\0');
+        return;
+    }
+    
+    /* Handle quoted paths (e.g., "C:\My Documents\file.txt") */
+    char szPath[MAX_PATH] = {0};
+    int i = 0;
+    
+    if (*lpCmdLine == '"') {
+        lpCmdLine++; /* Skip opening quote */
+        while (*lpCmdLine && *lpCmdLine != '"' && i < MAX_PATH - 1) {
+            szPath[i++] = *lpCmdLine++;
+        }
+    } else {
+        /* Unquoted path - read until space or end */
+        while (*lpCmdLine && *lpCmdLine != ' ' && *lpCmdLine != '\t' && i < MAX_PATH - 1) {
+            szPath[i++] = *lpCmdLine++;
+        }
+    }
+    szPath[i] = '\0';
+    
+    /* Convert to TCHAR (Unicode) */
+    if (szPath[0] != '\0') {
+        MultiByteToWideChar(CP_ACP, 0, szPath, -1, g_szCmdLineFile, MAX_PATH);
+    } else {
+        g_szCmdLineFile[0] = TEXT('\0');
+    }
+}
+
+/* Open file from command line after window is created */
+static void OpenCommandLineFile(HWND hwnd) {
+    if (g_szCmdLineFile[0] == TEXT('\0')) {
+        return;
+    }
+    
+    /* Check if file exists */
+    DWORD dwAttrib = GetFileAttributes(g_szCmdLineFile);
+    if (dwAttrib == INVALID_FILE_ATTRIBUTES) {
+        /* File doesn't exist - show error */
+        TCHAR szError[MAX_PATH + 64];
+        _sntprintf(szError, MAX_PATH + 64, 
+            TEXT("File tidak ditemukan:\n%s"), g_szCmdLineFile);
+        MessageBox(hwnd, szError, TEXT("Error"), MB_OK | MB_ICONERROR);
+        return;
+    }
+    
+    if (dwAttrib & FILE_ATTRIBUTE_DIRECTORY) {
+        /* It's a directory, not a file */
+        TCHAR szError[MAX_PATH + 64];
+        _sntprintf(szError, MAX_PATH + 64, 
+            TEXT("Path adalah direktori, bukan file:\n%s"), g_szCmdLineFile);
+        MessageBox(hwnd, szError, TEXT("Error"), MB_OK | MB_ICONERROR);
+        return;
+    }
+    
+    /* Get current tab state */
+    TabState* pTab = GetCurrentTabState();
+    if (!pTab) return;
+    
+    /* Load the file */
+    if (ReadFileContent(pTab->hwndEdit, g_szCmdLineFile)) {
+        /* Update tab state */
+        _tcscpy(pTab->szFileName, g_szCmdLineFile);
+        pTab->bUntitled = FALSE;
+        pTab->bModified = FALSE;
+        
+        /* Update tab title and window title */
+        UpdateTabTitle(g_AppState.nCurrentTab);
+        UpdateWindowTitle(hwnd);
+        
+        /* Detect language for syntax highlighting */
+        extern LanguageType DetectLanguage(const TCHAR* szFileName);
+        extern void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang);
+        extern BOOL g_bSyntaxHighlight;
+        
+        pTab->language = DetectLanguage(g_szCmdLineFile);
+        if (g_bSyntaxHighlight && pTab->language != LANG_NONE) {
+            /* Only apply syntax highlighting for small files */
+            if (pTab->dwTotalFileSize < THRESHOLD_SYNTAX_OFF) {
+                ApplySyntaxHighlighting(pTab->hwndEdit, pTab->language);
+            }
+        }
+    } else {
+        /* Failed to read file */
+        TCHAR szError[MAX_PATH + 64];
+        _sntprintf(szError, MAX_PATH + 64, 
+            TEXT("Gagal membuka file:\n%s"), g_szCmdLineFile);
+        MessageBox(hwnd, szError, TEXT("Error"), MB_OK | MB_ICONERROR);
+    }
+}
+
 /* WinMain entry point */
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, 
                    LPSTR lpCmdLine, int nCmdShow) {
     MSG msg;
     
     (void)hPrevInstance;
-    (void)lpCmdLine;
+    
+    /* Parse command line arguments */
+    ParseCommandLine(lpCmdLine);
     
     /* Load RichEdit library */
     g_hRichEdit = LoadLibrary(TEXT("Msftedit.dll"));
@@ -1549,6 +1674,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     
     /* Load accelerator table */
     g_AppState.hAccel = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDR_ACCEL));
+    
+    /* Open file from command line if provided */
+    OpenCommandLineFile(g_AppState.hwndMain);
     
     /* Message loop with accelerator and dialog handling */
     while (GetMessage(&msg, NULL, 0, 0)) {
