@@ -30,6 +30,14 @@ void InitVimMode(void) {
     g_VimState.bRegisterIsLine = FALSE;
 }
 
+/* Set vim mode state (for loading from session) */
+void SetVimModeEnabled(BOOL bEnabled) {
+    g_VimState.bEnabled = bEnabled;
+    if (bEnabled) {
+        g_VimState.mode = VIM_MODE_NORMAL;
+    }
+}
+
 /* Toggle vim mode on/off */
 void ToggleVimMode(HWND hwnd) {
     g_VimState.bEnabled = !g_VimState.bEnabled;
@@ -38,9 +46,9 @@ void ToggleVimMode(HWND hwnd) {
         g_VimState.hwndMain = hwnd;
     }
     HMENU hMenu = GetMenu(hwnd);
-    CheckMenuItem(hMenu, IDM_VIEW_VIMMODE, 
+    CheckMenuItem(hMenu, IDM_VIEW_VIMMODE,
                   g_VimState.bEnabled ? MF_CHECKED : MF_UNCHECKED);
-    
+
     /* Mark session dirty to save vim mode state */
     MarkSessionDirty();
 }

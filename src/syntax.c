@@ -381,10 +381,16 @@ void ApplySyntaxHighlighting(HWND hwndEdit, LanguageType lang) {
     /* Get text length */
     int nLen = GetWindowTextLengthW(hwndEdit);
     if (nLen == 0) return;
-    
-    /* SKIP syntax highlighting for very large files for performance */
-    if (nLen > 30000) {
-        return; /* No highlighting for files > 30KB for better performance */
+
+    /* SKIP syntax highlighting for very large files for performance
+     * Large files cause significant lag due to:
+     * - Full text buffer allocation
+     * - Sequential parsing of entire document
+     * - Multiple SendMessage calls for coloring ranges
+     * Limit set to 100KB as a reasonable balance between features and performance
+     */
+    if (nLen > 100000) {
+        return; /* No highlighting for files > 100KB for better performance */
     }
     
     /* Cache theme colors for performance */

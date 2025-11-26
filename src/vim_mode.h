@@ -40,6 +40,9 @@ extern VimState g_VimState;
 /* Initialize vim mode */
 void InitVimMode(void);
 
+/* Set vim mode enabled state (for loading from session) */
+void SetVimModeEnabled(BOOL bEnabled);
+
 /* Toggle vim mode on/off */
 void ToggleVimMode(HWND hwnd);
 
