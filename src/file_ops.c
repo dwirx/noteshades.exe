@@ -202,25 +202,26 @@ static LineEndingType DetectLineEnding(const char* pBuffer, DWORD dwSize) {
  * INTELLIGENT FILE MODE DETECTION
  * ============================================================================
  * Automatically selects the best loading strategy based on file size:
+ * (Thresholds optimized for responsiveness - prevents "Not Responding")
  *
- * FILEMODE_NORMAL (< 50MB):
+ * FILEMODE_NORMAL (< 2MB):
  *   - Full file loaded into RichEdit
- *   - All features enabled (syntax highlighting, editing, etc.)
+ *   - All features enabled (syntax highlighting for <256KB, editing, etc.)
  *   - Best user experience
  *
- * FILEMODE_PARTIAL (50MB - 200MB):
- *   - Load first 20MB initially
- *   - Show "Load More" button for remaining content
+ * FILEMODE_PARTIAL (2MB - 10MB):
+ *   - Load first 512KB initially
+ *   - Show "Load More" / F5 for remaining content
  *   - Editing enabled, syntax highlighting disabled
  *   - Good balance of performance and usability
  *
- * FILEMODE_READONLY (200MB - 1GB):
+ * FILEMODE_READONLY (10MB - 50MB):
  *   - Read-only preview mode
- *   - Load first 10MB for preview
+ *   - Load first 512KB for preview
  *   - View-only, no editing
  *   - Fast loading, minimal memory
  *
- * FILEMODE_MMAP (> 1GB):
+ * FILEMODE_MMAP (> 50MB):
  *   - Memory-mapped file (no load into RAM)
  *   - Virtual scrolling
  *   - Ultra-fast opening
@@ -230,16 +231,16 @@ static LineEndingType DetectLineEnding(const char* pBuffer, DWORD dwSize) {
 /* Public function for file mode detection - uses threshold constants from notepad.h */
 FileModeType DetectOptimalFileMode(DWORD dwFileSize) {
     if (dwFileSize < THRESHOLD_PARTIAL) {
-        /* < 50MB: Normal mode - full experience */
+        /* < 2MB: Normal mode - full experience */
         return FILEMODE_NORMAL;
     } else if (dwFileSize < THRESHOLD_READONLY) {
-        /* 50MB - 200MB: Partial loading mode */
+        /* 2MB - 10MB: Partial loading mode */
         return FILEMODE_PARTIAL;
     } else if (dwFileSize < THRESHOLD_MMAP) {
-        /* 200MB - 1GB: Read-only preview mode */
+        /* 10MB - 50MB: Read-only preview mode */
         return FILEMODE_READONLY;
     } else {
-        /* > 1GB: Memory-mapped mode */
+        /* > 50MB: Memory-mapped mode */
         return FILEMODE_MMAP;
     }
 }
@@ -253,22 +254,23 @@ void ShowLargeFileInfo(HWND hwnd, DWORD dwFileSize, FileModeType mode) {
     switch (mode) {
         case FILEMODE_PARTIAL:
             szModeName = TEXT("Partial Loading Mode");
-            szDetails = TEXT("The file will be loaded in chunks for better performance.\n")
-                       TEXT("Click 'Load More' button in the status bar to load additional content.");
+            szDetails = TEXT("File akan dimuat dalam chunks untuk performa lebih baik.\n")
+                       TEXT("Tekan F5 untuk memuat konten tambahan.\n")
+                       TEXT("Syntax highlighting dinonaktifkan untuk file ini.");
             break;
 
         case FILEMODE_READONLY:
             szModeName = TEXT("Read-Only Preview Mode");
-            szDetails = TEXT("This very large file is opened in read-only mode for performance.\n")
-                       TEXT("Only a preview of the first portion is shown.\n")
-                       TEXT("To edit, please use a specialized large file editor.");
+            szDetails = TEXT("File besar ini dibuka dalam mode read-only untuk performa.\n")
+                       TEXT("Hanya preview 512KB pertama yang ditampilkan.\n")
+                       TEXT("Untuk edit, gunakan editor khusus file besar.");
             break;
 
         case FILEMODE_MMAP:
             szModeName = TEXT("Memory-Mapped Mode");
-            szDetails = TEXT("This extremely large file is opened using memory-mapping.\n")
-                       TEXT("The file is not loaded into RAM, providing instant access.\n")
-                       TEXT("Read-only mode for optimal performance.");
+            szDetails = TEXT("File sangat besar ini dibuka menggunakan memory-mapping.\n")
+                       TEXT("File tidak dimuat ke RAM, memberikan akses instan.\n")
+                       TEXT("Mode read-only untuk performa optimal.");
             break;
 
         default:
@@ -276,7 +278,7 @@ void ShowLargeFileInfo(HWND hwnd, DWORD dwFileSize, FileModeType mode) {
     }
 
     _sntprintf(szMessage, 512,
-        TEXT("Large File Detected (%.1f MB)\n\n")
+        TEXT("File Besar Terdeteksi (%.2f MB)\n\n")
         TEXT("Mode: %s\n\n")
         TEXT("%s"),
         dwFileSize / (1024.0 * 1024.0),
@@ -551,12 +553,13 @@ static DWORD CALLBACK MemoryStreamCallback(DWORD_PTR dwCookie, LPBYTE pbBuff, LO
  * ============================================================================
  * Instead of loading entire file and freezing UI, we use intelligent modes:
  *
- * 1. For small files (<50MB): Traditional full loading
- * 2. For medium files (50-200MB): Chunked loading (load first chunk instantly)
- * 3. For large files (200MB-1GB): Read-only preview (first 10MB only)
- * 4. For huge files (>1GB): Memory-mapped (instant "loading", no RAM used)
+ * 1. For small files (<2MB): Traditional full loading with progress
+ * 2. For medium files (2-10MB): Chunked loading (load first 512KB instantly)
+ * 3. For large files (10-50MB): Read-only preview (first 512KB only)
+ * 4. For huge files (>50MB): Memory-mapped (instant "loading", no RAM used)
  *
  * This approach is used by modern editors like VS Code, Sublime Text.
+ * Thresholds lowered significantly for better responsiveness on all systems.
  * ========================================================================= */
 
 /* Load file chunk by chunk - for FILEMODE_PARTIAL */
@@ -673,14 +676,14 @@ BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
     }
 
     /* ============================================================================
-     * MEMORY-MAPPED MODE - For files > 1GB
+     * MEMORY-MAPPED MODE - For files > 50MB
      * Use memory-mapping for instant "loading" without using RAM
      * Read-only mode for optimal performance
      * ========================================================================= */
     if (fileMode == FILEMODE_MMAP || bIsVeryLarge) {
         /* For extremely large files, use memory-mapped approach */
-        /* Load only first 10MB as preview, similar to read-only mode */
-        DWORD dwPreviewSize = PREVIEW_SIZE; /* 10MB preview */
+        /* Load only first 512KB as preview for instant display */
+        DWORD dwPreviewSize = PREVIEW_SIZE; /* 512KB preview */
         DWORD dwLoaded = 0;
         BOOL bResult = LoadFileChunked(hEdit, szFileName, dwPreviewSize, &dwLoaded);
 
@@ -710,12 +713,12 @@ BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
     }
 
     /* ============================================================================
-     * CHUNKED LOADING MODE - For 50-200MB files
-     * Only load first 20MB instantly, rest on demand
+     * CHUNKED LOADING MODE - For 2-10MB files
+     * Only load first 512KB instantly, rest on demand via F5
      * This prevents UI freeze while still allowing editing
      * ========================================================================= */
     if (fileMode == FILEMODE_PARTIAL) {
-        DWORD dwChunkSize = INITIAL_CHUNK_SIZE; /* Load 20MB initially */
+        DWORD dwChunkSize = INITIAL_CHUNK_SIZE; /* Load 512KB initially */
         if (pTab) {
             pTab->dwChunkSize = dwChunkSize;
         }
@@ -726,11 +729,11 @@ BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
         if (bResult && pTab) {
             pTab->dwLoadedSize = dwLoaded;
 
-            /* Show status: "Loaded 20MB of 150MB - Click 'Load More' for rest" */
+            /* Show status with loaded size info */
             TCHAR szStatus[256];
             _sntprintf(szStatus, 256,
-                TEXT("Partial Load: %.1f MB of %.1f MB loaded - Press F5 to load more"),
-                dwLoaded / (1024.0 * 1024.0),
+                TEXT("Partial Load: %.1f KB of %.1f MB loaded - Press F5 to load more"),
+                dwLoaded / 1024.0,
                 dwFileSize / (1024.0 * 1024.0));
             SetWindowText(g_AppState.hwndStatus, szStatus);
         }
@@ -739,12 +742,12 @@ BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
     }
 
     /* ============================================================================
-     * READ-ONLY PREVIEW MODE - For 200MB-1GB files
-     * Load only first 10MB for quick preview
+     * READ-ONLY PREVIEW MODE - For 10-50MB files
+     * Load only first 512KB for quick preview
      * Editing disabled for performance
      * ========================================================================= */
     if (fileMode == FILEMODE_READONLY) {
-        DWORD dwPreviewSize = PREVIEW_SIZE; /* 10MB preview */
+        DWORD dwPreviewSize = PREVIEW_SIZE; /* 512KB preview */
         DWORD dwLoaded = 0;
         BOOL bResult = LoadFileChunked(hEdit, szFileName, dwPreviewSize, &dwLoaded);
 
@@ -773,8 +776,9 @@ BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
     }
 
     /* ============================================================================
-     * NORMAL MODE - For files < 50MB
+     * NORMAL MODE - For files < 2MB
      * Use the existing background thread + streaming approach
+     * Show progress dialog for files > 1MB
      * ========================================================================= */
 
     /* Initialize thread data */
@@ -790,12 +794,12 @@ BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
         return FALSE;
     }
 
-    /* For small files, use modal dialog. For large files, use modeless to allow streaming. */
-    BOOL bUseLargeFileMode = (dwFileSize > 10 * 1024 * 1024);
+    /* Show progress dialog for files > 1MB to prevent "Not Responding" perception */
+    BOOL bShowProgressDialog = (dwFileSize > THRESHOLD_PROGRESS);
     HWND hProgressDlg = NULL;
 
-    if (bUseLargeFileMode) {
-        /* Create modeless dialog for large files */
+    if (bShowProgressDialog) {
+        /* Create modeless dialog for better responsiveness */
         hProgressDlg = CreateDialogParam(g_AppState.hInstance, MAKEINTRESOURCE(IDD_PROGRESS),
                                         g_ThreadData.hwndMain, ProgressDlgProc, (LPARAM)&g_ThreadData);
         if (hProgressDlg) {
@@ -803,8 +807,8 @@ BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
             UpdateWindow(hProgressDlg);
         }
 
-        /* Wait for thread with message processing */
-        while (WaitForSingleObject(g_hLoadThread, 50) == WAIT_TIMEOUT) {
+        /* Wait for thread with message processing - check every 30ms for responsiveness */
+        while (WaitForSingleObject(g_hLoadThread, 30) == WAIT_TIMEOUT) {
             MSG msg;
             while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
                 if (!hProgressDlg || !IsDialogMessage(hProgressDlg, &msg)) {
@@ -815,11 +819,13 @@ BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
             if (g_ThreadData.bCancelled) break;
         }
     } else {
-        /* Small files: use modal dialog */
-        INT_PTR result = DialogBoxParam(g_AppState.hInstance, MAKEINTRESOURCE(IDD_PROGRESS),
-                                       g_ThreadData.hwndMain, ProgressDlgProc, (LPARAM)&g_ThreadData);
-        if (result != IDOK) {
-            WaitForSingleObject(g_hLoadThread, INFINITE);
+        /* Very small files (<1MB): wait with message processing but no dialog */
+        while (WaitForSingleObject(g_hLoadThread, 10) == WAIT_TIMEOUT) {
+            MSG msg;
+            while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
         }
     }
 
@@ -862,14 +868,16 @@ BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
     /* Disable undo buffer during load for better performance */
     SendMessage(hEdit, EM_SETUNDOLIMIT, 0, 0);
 
-    /* For small files (<2MB), use direct SetWindowText - fast enough */
-    if (g_ThreadData.dwWideLen < (2 * 1024 * 1024 / sizeof(WCHAR))) {
+    /* For very small files (<500KB), use direct SetWindowText - fast enough */
+    if (g_ThreadData.dwWideLen < (500 * 1024 / sizeof(WCHAR))) {
         SetWindowTextW(hEdit, g_ThreadData.pWideText);
     } else {
-        /* For larger files, load in chunks with message processing */
-        DWORD dwChunkChars = 50000; /* 50K characters per chunk */
+        /* For larger files, load in smaller chunks with message processing */
+        /* Use 10K characters per chunk for maximum responsiveness */
+        DWORD dwChunkChars = 10000; /* 10K characters per chunk - smaller = more responsive */
         DWORD dwPos = 0;
         DWORD dwTotal = g_ThreadData.dwWideLen;
+        DWORD dwLastUpdate = GetTickCount();
         
         /* Clear edit control first */
         SetWindowTextW(hEdit, TEXT(""));
@@ -891,14 +899,16 @@ BOOL ReadFileContent(HWND hEdit, const TCHAR* szFileName) {
             
             dwPos += dwToAdd;
             
-            /* Update progress */
-            if (hProgressDlg && IsWindow(hProgressDlg)) {
+            /* Update progress every 100ms to avoid UI overhead */
+            DWORD dwNow = GetTickCount();
+            if (hProgressDlg && IsWindow(hProgressDlg) && (dwNow - dwLastUpdate > 100)) {
                 int nPercent = (int)((dwPos * 100) / dwTotal);
                 SendDlgItemMessage(hProgressDlg, IDC_PROGRESS_BAR, PBM_SETPOS, nPercent, 0);
                 
                 TCHAR szProgress[128];
                 _sntprintf(szProgress, 128, TEXT("Loading into editor... %d%%"), nPercent);
                 SetDlgItemText(hProgressDlg, IDC_PROGRESS_TEXT, szProgress);
+                dwLastUpdate = dwNow;
             }
             
             /* CRITICAL: Process Windows messages to prevent "Not Responding" */
@@ -1278,25 +1288,44 @@ BOOL FileOpen(HWND hwnd) {
 
     /* Apply syntax highlighting AFTER display update for better responsiveness */
     /* Only for small files - large files skip highlighting for performance */
-    /* Use file size instead of GetWindowTextLength for performance */
-    HANDLE hFile = CreateFile(szFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    DWORD dwFileSize = 0;
-    if (hFile != INVALID_HANDLE_VALUE) {
-        dwFileSize = GetFileSize(hFile, NULL);
-        CloseHandle(hFile);
+    /* Use stored file size from tab state for efficiency */
+    DWORD dwFileSize = pTab->dwTotalFileSize;
+    if (dwFileSize == 0) {
+        /* Fallback: get file size if not stored */
+        HANDLE hFile = CreateFile(szFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile != INVALID_HANDLE_VALUE) {
+            dwFileSize = GetFileSize(hFile, NULL);
+            CloseHandle(hFile);
+        }
     }
 
-    /* Limit: 1MB file size for syntax highlighting */
-    BOOL bEnableSyntax = (dwFileSize < (1024 * 1024));
+    /* Check line count for syntax threshold */
+    int nLineCount = (int)SendMessage(hwndEdit, EM_GETLINECOUNT, 0, 0);
+
+    /* Disable syntax highlighting for:
+     * - Files > 256KB (THRESHOLD_SYNTAX_OFF)
+     * - Files with > 5000 lines (THRESHOLD_LINE_SYNTAX)
+     * - Files in non-normal mode (partial, readonly, mmap)
+     */
+    BOOL bEnableSyntax = (dwFileSize < THRESHOLD_SYNTAX_OFF) && 
+                         (nLineCount < THRESHOLD_LINE_SYNTAX) &&
+                         (pTab->fileMode == FILEMODE_NORMAL);
 
     if (g_bSyntaxHighlight && pTab->language != LANG_NONE && bEnableSyntax) {
         SetWindowText(g_AppState.hwndStatus, TEXT("Applying syntax highlighting..."));
         ApplySyntaxHighlighting(hwndEdit, pTab->language);
-    } else if (!bEnableSyntax) {
+    } else if (!bEnableSyntax && pTab->language != LANG_NONE) {
         /* Notify user that syntax highlighting is disabled for this large file */
         TCHAR szInfo[256];
-        _sntprintf(szInfo, 256, TEXT("Large file (%.1f MB): Syntax highlighting disabled for performance"),
-                   dwFileSize / (1024.0 * 1024.0));
+        if (nLineCount >= THRESHOLD_LINE_SYNTAX) {
+            _sntprintf(szInfo, 256, TEXT("Large file (%d lines): Syntax highlighting disabled for performance"),
+                       nLineCount);
+        } else if (pTab->fileMode != FILEMODE_NORMAL) {
+            _sntprintf(szInfo, 256, TEXT("Partial/Preview mode: Syntax highlighting disabled"));
+        } else {
+            _sntprintf(szInfo, 256, TEXT("Large file (%.1f KB): Syntax highlighting disabled for performance"),
+                       dwFileSize / 1024.0);
+        }
         SetWindowText(g_AppState.hwndStatus, szInfo);
     }
 

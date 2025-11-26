@@ -62,18 +62,20 @@ typedef enum {
     FILEMODE_MMAP                /* Memory-mapped mode (>1GB) */
 } FileModeType;
 
-/* Large file threshold constants - LOWERED for better responsiveness */
-#define THRESHOLD_PARTIAL       (5 * 1024 * 1024)       /* 5MB - switch to partial mode */
-#define THRESHOLD_READONLY      (50 * 1024 * 1024)      /* 50MB - switch to read-only */
-#define THRESHOLD_MMAP          (200 * 1024 * 1024)     /* 200MB - switch to memory-mapped */
-#define THRESHOLD_SYNTAX_OFF    (512 * 1024)            /* 512KB - disable syntax highlighting */
-#define THRESHOLD_PROGRESS      (2 * 1024 * 1024)       /* 2MB - show progress dialog */
+/* Large file threshold constants - OPTIMIZED for better responsiveness */
+#define THRESHOLD_PROGRESS      (1 * 1024 * 1024)       /* 1MB - show progress dialog */
+#define THRESHOLD_PARTIAL       (2 * 1024 * 1024)       /* 2MB - switch to partial mode */
+#define THRESHOLD_READONLY      (10 * 1024 * 1024)      /* 10MB - switch to read-only */
+#define THRESHOLD_MMAP          (50 * 1024 * 1024)      /* 50MB - switch to memory-mapped */
+#define THRESHOLD_SYNTAX_OFF    (256 * 1024)            /* 256KB - disable syntax highlighting */
+#define THRESHOLD_LINE_SYNTAX   5000                     /* 5000 lines - disable syntax */
 
 /* Chunk size constants for large file loading */
-#define INITIAL_CHUNK_SIZE      (2 * 1024 * 1024)       /* 2MB initial load for fast display */
-#define LOAD_MORE_CHUNK         (5 * 1024 * 1024)       /* 5MB per F5 press */
-#define PREVIEW_SIZE            (2 * 1024 * 1024)       /* 2MB preview for read-only */
-#define THREAD_CHUNK_SIZE       (64 * 1024)             /* 64KB read chunks for responsiveness */
+#define INITIAL_CHUNK_SIZE      (512 * 1024)            /* 512KB initial load for instant display */
+#define LOAD_MORE_CHUNK         (1 * 1024 * 1024)       /* 1MB per F5 press */
+#define PREVIEW_SIZE            (512 * 1024)            /* 512KB preview for read-only */
+#define THREAD_CHUNK_SIZE       (32 * 1024)             /* 32KB read chunks for max responsiveness */
+#define STREAM_CHUNK_SIZE       (16 * 1024)             /* 16KB for streaming to RichEdit */
 
 /* Undo buffer limits */
 #define UNDO_LIMIT_LARGE_FILE   100                     /* Max undo operations for large files */

@@ -80,19 +80,22 @@ flowchart TD
 ```c
 /* File loading modes - already defined in notepad.h */
 typedef enum {
-    FILEMODE_NORMAL = 0,    /* < 50MB: Full load */
-    FILEMODE_PARTIAL,       /* 50-200MB: Chunked loading */
-    FILEMODE_READONLY,      /* 200MB-1GB: Read-only preview */
-    FILEMODE_MMAP           /* > 1GB: Memory-mapped */
+    FILEMODE_NORMAL = 0,    /* < 2MB: Full load */
+    FILEMODE_PARTIAL,       /* 2-10MB: Chunked loading */
+    FILEMODE_READONLY,      /* 10-50MB: Read-only preview */
+    FILEMODE_MMAP           /* > 50MB: Memory-mapped */
 } FileModeType;
 
 /* Mode detection function */
 FileModeType DetectOptimalFileMode(DWORD dwFileSize);
 
-/* Mode thresholds (configurable) */
-#define THRESHOLD_PARTIAL    (50 * 1024 * 1024)   /* 50MB */
-#define THRESHOLD_READONLY   (200 * 1024 * 1024)  /* 200MB */
-#define THRESHOLD_MMAP       (1024 * 1024 * 1024) /* 1GB */
+/* Mode thresholds (OPTIMIZED for responsiveness) */
+#define THRESHOLD_PROGRESS      (1 * 1024 * 1024)   /* 1MB - show progress */
+#define THRESHOLD_PARTIAL       (2 * 1024 * 1024)   /* 2MB */
+#define THRESHOLD_READONLY      (10 * 1024 * 1024)  /* 10MB */
+#define THRESHOLD_MMAP          (50 * 1024 * 1024)  /* 50MB */
+#define THRESHOLD_SYNTAX_OFF    (256 * 1024)        /* 256KB - disable syntax */
+#define THRESHOLD_LINE_SYNTAX   5000                /* 5000 lines - disable syntax */
 ```
 
 ### 2. Background Thread Loader
@@ -171,10 +174,12 @@ BOOL LoadFileChunked(HWND hEdit, const TCHAR* szFileName,
 BOOL LoadMoreContent(HWND hwnd);
 BOOL AppendChunkToEdit(HWND hEdit, const WCHAR* pText, DWORD dwLen);
 
-/* Chunk size constants */
-#define INITIAL_CHUNK_SIZE  (20 * 1024 * 1024)  /* 20MB initial */
-#define LOAD_MORE_CHUNK     (20 * 1024 * 1024)  /* 20MB per F5 */
-#define PREVIEW_SIZE        (10 * 1024 * 1024)  /* 10MB preview */
+/* Chunk size constants (OPTIMIZED for instant display) */
+#define INITIAL_CHUNK_SIZE  (512 * 1024)        /* 512KB initial - instant display */
+#define LOAD_MORE_CHUNK     (1 * 1024 * 1024)   /* 1MB per F5 */
+#define PREVIEW_SIZE        (512 * 1024)        /* 512KB preview */
+#define THREAD_CHUNK_SIZE   (32 * 1024)         /* 32KB read chunks */
+#define STREAM_CHUNK_SIZE   (16 * 1024)         /* 16KB for RichEdit streaming */
 ```
 
 ### 6. Chunked Saving Manager
