@@ -126,4 +126,45 @@ void VimMoveMatchingBracket(HWND hwndEdit);
 void VimMoveParagraphForward(HWND hwndEdit, int count);
 void VimMoveParagraphBackward(HWND hwndEdit, int count);
 
+/* WORD motions (whitespace-delimited) */
+void VimMoveWORDForward(HWND hwndEdit, int count);
+void VimMoveWORDBackward(HWND hwndEdit, int count);
+void VimMoveWORDEnd(HWND hwndEdit, int count);
+void VimMoveWordEndBackward(HWND hwndEdit, int count);
+void VimMoveWORDEndBackward(HWND hwndEdit, int count);
+
+/* Screen position motions */
+void VimMoveScreenTop(HWND hwndEdit);
+void VimMoveScreenMiddle(HWND hwndEdit);
+void VimMoveScreenBottom(HWND hwndEdit);
+
+/* Line motions */
+void VimMoveNextLineFirstNonBlank(HWND hwndEdit, int count);
+void VimMovePrevLineFirstNonBlank(HWND hwndEdit, int count);
+
+/* Additional edit commands */
+void VimReplaceChar(HWND hwndEdit, TCHAR ch);
+void VimSubstituteChar(HWND hwndEdit, int count);
+void VimSubstituteLine(HWND hwndEdit);
+void VimChangeToEnd(HWND hwndEdit);
+void VimToggleCase(HWND hwndEdit);
+
+/* Text object selection result */
+typedef struct {
+    DWORD dwStart;          /* Selection start */
+    DWORD dwEnd;            /* Selection end */
+    BOOL bFound;            /* Object was found */
+} TextObjectRange;
+
+/* Text object functions */
+TextObjectRange VimSelectInnerWord(HWND hwndEdit);
+TextObjectRange VimSelectAWord(HWND hwndEdit);
+TextObjectRange VimSelectInnerQuote(HWND hwndEdit, TCHAR chQuote);
+TextObjectRange VimSelectAQuote(HWND hwndEdit, TCHAR chQuote);
+TextObjectRange VimSelectInnerBracket(HWND hwndEdit, TCHAR chOpen, TCHAR chClose);
+TextObjectRange VimSelectABracket(HWND hwndEdit, TCHAR chOpen, TCHAR chClose);
+
+/* Apply text object with operator */
+void VimApplyTextObject(HWND hwndEdit, TCHAR chOp, TextObjectRange range);
+
 #endif /* VIM_MODE_H */

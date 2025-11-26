@@ -436,6 +436,537 @@ void VimMoveWordEnd(HWND hwndEdit, int count) {
     g_VimState.nDesiredCol = GetCurrentCol(hwndEdit);
 }
 
+/* ============ WORD Motions (whitespace-delimited) ============ */
+
+/* Helper: check if character is whitespace */
+static BOOL IsWhitespace(TCHAR ch) {
+    return ch == TEXT(' ') || ch == TEXT('\t') || ch == TEXT('\r') || ch == TEXT('\n');
+}
+
+/* W - move to next WORD (whitespace-delimited) */
+void VimMoveWORDForward(HWND hwndEdit, int count) {
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (!pText) return;
+    
+    DWORD pos = GetEditCursorPos(hwndEdit);
+    for (int i = 0; i < count && pos < textLen; i++) {
+        /* Skip non-whitespace */
+        while (pos < textLen && !IsWhitespace(pText[pos])) pos++;
+        /* Skip whitespace */
+        while (pos < textLen && IsWhitespace(pText[pos])) pos++;
+    }
+    FreeTextBuffer(pText);
+    
+    if (g_VimState.mode == VIM_MODE_VISUAL) {
+        UpdateVisualSelection(hwndEdit, pos);
+    } else {
+        SetEditCursorPos(hwndEdit, pos);
+    }
+    g_VimState.nDesiredCol = GetCurrentCol(hwndEdit);
+}
+
+/* B - move to previous WORD */
+void VimMoveWORDBackward(HWND hwndEdit, int count) {
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (!pText) return;
+    
+    DWORD pos = GetEditCursorPos(hwndEdit);
+    for (int i = 0; i < count && pos > 0; i++) {
+        /* Skip whitespace backward */
+        while (pos > 0 && IsWhitespace(pText[pos - 1])) pos--;
+        /* Skip non-whitespace backward */
+        while (pos > 0 && !IsWhitespace(pText[pos - 1])) pos--;
+    }
+    FreeTextBuffer(pText);
+    
+    if (g_VimState.mode == VIM_MODE_VISUAL) {
+        UpdateVisualSelection(hwndEdit, pos);
+    } else {
+        SetEditCursorPos(hwndEdit, pos);
+    }
+    g_VimState.nDesiredCol = GetCurrentCol(hwndEdit);
+}
+
+/* E - move to end of WORD */
+void VimMoveWORDEnd(HWND hwndEdit, int count) {
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (!pText) return;
+    
+    DWORD pos = GetEditCursorPos(hwndEdit);
+    for (int i = 0; i < count && pos < textLen; i++) {
+        pos++;
+        /* Skip whitespace */
+        while (pos < textLen && IsWhitespace(pText[pos])) pos++;
+        /* Skip non-whitespace */
+        while (pos < textLen && !IsWhitespace(pText[pos])) pos++;
+        if (pos > 0) pos--;
+    }
+    FreeTextBuffer(pText);
+    
+    if (g_VimState.mode == VIM_MODE_VISUAL) {
+        UpdateVisualSelection(hwndEdit, pos);
+    } else {
+        SetEditCursorPos(hwndEdit, pos);
+    }
+    g_VimState.nDesiredCol = GetCurrentCol(hwndEdit);
+}
+
+/* ge - move to end of previous word */
+void VimMoveWordEndBackward(HWND hwndEdit, int count) {
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (!pText) return;
+    
+    DWORD pos = GetEditCursorPos(hwndEdit);
+    for (int i = 0; i < count && pos > 0; i++) {
+        if (pos > 0) pos--;
+        /* Skip non-word characters backward */
+        while (pos > 0 && !IsCharAlphaNumeric(pText[pos]) && pText[pos] != TEXT('_')) pos--;
+        /* Skip word characters backward to find start, then go to end */
+        while (pos > 0 && (IsCharAlphaNumeric(pText[pos - 1]) || pText[pos - 1] == TEXT('_'))) pos--;
+    }
+    FreeTextBuffer(pText);
+    
+    if (g_VimState.mode == VIM_MODE_VISUAL) {
+        UpdateVisualSelection(hwndEdit, pos);
+    } else {
+        SetEditCursorPos(hwndEdit, pos);
+    }
+    g_VimState.nDesiredCol = GetCurrentCol(hwndEdit);
+}
+
+/* gE - move to end of previous WORD */
+void VimMoveWORDEndBackward(HWND hwndEdit, int count) {
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (!pText) return;
+    
+    DWORD pos = GetEditCursorPos(hwndEdit);
+    for (int i = 0; i < count && pos > 0; i++) {
+        if (pos > 0) pos--;
+        /* Skip whitespace backward */
+        while (pos > 0 && IsWhitespace(pText[pos])) pos--;
+        /* Skip non-whitespace backward */
+        while (pos > 0 && !IsWhitespace(pText[pos - 1])) pos--;
+    }
+    FreeTextBuffer(pText);
+    
+    if (g_VimState.mode == VIM_MODE_VISUAL) {
+        UpdateVisualSelection(hwndEdit, pos);
+    } else {
+        SetEditCursorPos(hwndEdit, pos);
+    }
+    g_VimState.nDesiredCol = GetCurrentCol(hwndEdit);
+}
+
+/* ============ Screen Position Motions ============ */
+
+/* H - move to top of screen */
+void VimMoveScreenTop(HWND hwndEdit) {
+    int firstLine = (int)SendMessage(hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
+    DWORD newPos = GetLineIndex(hwndEdit, firstLine);
+    
+    if (g_VimState.mode == VIM_MODE_VISUAL) {
+        UpdateVisualSelection(hwndEdit, newPos);
+    } else {
+        SetEditCursorPos(hwndEdit, newPos);
+    }
+    VimMoveFirstNonBlank(hwndEdit);
+}
+
+/* M - move to middle of screen */
+void VimMoveScreenMiddle(HWND hwndEdit) {
+    int firstLine = (int)SendMessage(hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
+    RECT rc;
+    GetClientRect(hwndEdit, &rc);
+    int visibleLines = (rc.bottom - rc.top) / 16;
+    if (visibleLines < 1) visibleLines = 20;
+    
+    int middleLine = firstLine + visibleLines / 2;
+    int totalLines = GetLineCount(hwndEdit);
+    if (middleLine >= totalLines) middleLine = totalLines - 1;
+    
+    DWORD newPos = GetLineIndex(hwndEdit, middleLine);
+    
+    if (g_VimState.mode == VIM_MODE_VISUAL) {
+        UpdateVisualSelection(hwndEdit, newPos);
+    } else {
+        SetEditCursorPos(hwndEdit, newPos);
+    }
+    VimMoveFirstNonBlank(hwndEdit);
+}
+
+/* L - move to bottom of screen */
+void VimMoveScreenBottom(HWND hwndEdit) {
+    int firstLine = (int)SendMessage(hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
+    RECT rc;
+    GetClientRect(hwndEdit, &rc);
+    int visibleLines = (rc.bottom - rc.top) / 16;
+    if (visibleLines < 1) visibleLines = 20;
+    
+    int bottomLine = firstLine + visibleLines - 1;
+    int totalLines = GetLineCount(hwndEdit);
+    if (bottomLine >= totalLines) bottomLine = totalLines - 1;
+    
+    DWORD newPos = GetLineIndex(hwndEdit, bottomLine);
+    
+    if (g_VimState.mode == VIM_MODE_VISUAL) {
+        UpdateVisualSelection(hwndEdit, newPos);
+    } else {
+        SetEditCursorPos(hwndEdit, newPos);
+    }
+    VimMoveFirstNonBlank(hwndEdit);
+}
+
+/* + or Enter - move to first non-blank of next line */
+void VimMoveNextLineFirstNonBlank(HWND hwndEdit, int count) {
+    VimMoveDown(hwndEdit, count);
+    VimMoveFirstNonBlank(hwndEdit);
+}
+
+/* - move to first non-blank of previous line */
+void VimMovePrevLineFirstNonBlank(HWND hwndEdit, int count) {
+    VimMoveUp(hwndEdit, count);
+    VimMoveFirstNonBlank(hwndEdit);
+}
+
+/* ============ Additional Edit Commands ============ */
+
+/* r - replace single character */
+void VimReplaceChar(HWND hwndEdit, TCHAR ch) {
+    DWORD pos = GetEditCursorPos(hwndEdit);
+    DWORD textLen = GetTextLen(hwndEdit);
+    if (pos >= textLen) return;
+    
+    /* Select the character and replace it */
+    SendMessage(hwndEdit, EM_SETSEL, pos, pos + 1);
+    TCHAR szReplace[2] = { ch, TEXT('\0') };
+    SendMessage(hwndEdit, EM_REPLACESEL, TRUE, (LPARAM)szReplace);
+    /* Move cursor back to the replaced position */
+    SetEditCursorPos(hwndEdit, pos);
+}
+
+/* s - substitute character (delete and enter insert mode) */
+void VimSubstituteChar(HWND hwndEdit, int count) {
+    VimDeleteChar(hwndEdit, count);
+    g_VimState.mode = VIM_MODE_INSERT;
+}
+
+/* S - substitute line (delete line content and enter insert mode) */
+void VimSubstituteLine(HWND hwndEdit) {
+    DWORD pos = GetEditCursorPos(hwndEdit);
+    int line = GetLineFromChar(hwndEdit, pos);
+    DWORD lineStart = GetLineIndex(hwndEdit, line);
+    int lineLen = GetLineLen(hwndEdit, line);
+    
+    /* Find first non-blank */
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    DWORD firstNonBlank = lineStart;
+    if (pText) {
+        for (DWORD i = lineStart; i < lineStart + lineLen; i++) {
+            if (pText[i] != TEXT(' ') && pText[i] != TEXT('\t')) {
+                firstNonBlank = i;
+                break;
+            }
+        }
+        FreeTextBuffer(pText);
+    }
+    
+    /* Delete from first non-blank to end of line */
+    SendMessage(hwndEdit, EM_SETSEL, firstNonBlank, lineStart + lineLen);
+    SendMessage(hwndEdit, EM_REPLACESEL, TRUE, (LPARAM)TEXT(""));
+    g_VimState.mode = VIM_MODE_INSERT;
+}
+
+/* C - change to end of line */
+void VimChangeToEnd(HWND hwndEdit) {
+    VimDeleteToEnd(hwndEdit);
+    g_VimState.mode = VIM_MODE_INSERT;
+}
+
+/* ~ - toggle case of character under cursor */
+void VimToggleCase(HWND hwndEdit) {
+    DWORD pos = GetEditCursorPos(hwndEdit);
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (!pText || pos >= textLen) {
+        if (pText) FreeTextBuffer(pText);
+        return;
+    }
+    
+    TCHAR ch = pText[pos];
+    TCHAR newCh = ch;
+    
+    /* Toggle case using simple ASCII check for better compatibility */
+    if (ch >= TEXT('a') && ch <= TEXT('z')) {
+        newCh = ch - TEXT('a') + TEXT('A');
+    } else if (ch >= TEXT('A') && ch <= TEXT('Z')) {
+        newCh = ch - TEXT('A') + TEXT('a');
+    }
+    FreeTextBuffer(pText);
+    
+    if (newCh != ch) {
+        SendMessage(hwndEdit, EM_SETSEL, pos, pos + 1);
+        TCHAR szReplace[2] = { newCh, TEXT('\0') };
+        SendMessage(hwndEdit, EM_REPLACESEL, TRUE, (LPARAM)szReplace);
+    }
+    
+    /* Move cursor right */
+    SetEditCursorPos(hwndEdit, pos + 1);
+}
+
+/* ============ Text Objects ============ */
+
+/* Select inner word (iw) */
+TextObjectRange VimSelectInnerWord(HWND hwndEdit) {
+    TextObjectRange range = {0, 0, FALSE};
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (!pText || textLen == 0) return range;
+    
+    DWORD pos = GetEditCursorPos(hwndEdit);
+    if (pos >= textLen) {
+        FreeTextBuffer(pText);
+        return range;
+    }
+    
+    /* Check if on a word character */
+    BOOL onWord = IsCharAlphaNumeric(pText[pos]) || pText[pos] == TEXT('_');
+    
+    if (onWord) {
+        /* Find word boundaries */
+        DWORD start = pos, end = pos;
+        while (start > 0 && (IsCharAlphaNumeric(pText[start - 1]) || pText[start - 1] == TEXT('_'))) start--;
+        while (end < textLen && (IsCharAlphaNumeric(pText[end]) || pText[end] == TEXT('_'))) end++;
+        range.dwStart = start;
+        range.dwEnd = end;
+        range.bFound = TRUE;
+    } else {
+        /* On whitespace - select whitespace */
+        DWORD start = pos, end = pos;
+        while (start > 0 && (pText[start - 1] == TEXT(' ') || pText[start - 1] == TEXT('\t'))) start--;
+        while (end < textLen && (pText[end] == TEXT(' ') || pText[end] == TEXT('\t'))) end++;
+        if (end > start) {
+            range.dwStart = start;
+            range.dwEnd = end;
+            range.bFound = TRUE;
+        }
+    }
+    
+    FreeTextBuffer(pText);
+    return range;
+}
+
+/* Select a word including surrounding whitespace (aw) */
+TextObjectRange VimSelectAWord(HWND hwndEdit) {
+    TextObjectRange range = {0, 0, FALSE};
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (!pText || textLen == 0) return range;
+    
+    DWORD pos = GetEditCursorPos(hwndEdit);
+    if (pos >= textLen) {
+        FreeTextBuffer(pText);
+        return range;
+    }
+    
+    BOOL onWord = IsCharAlphaNumeric(pText[pos]) || pText[pos] == TEXT('_');
+    
+    if (onWord) {
+        /* Find word boundaries */
+        DWORD start = pos, end = pos;
+        while (start > 0 && (IsCharAlphaNumeric(pText[start - 1]) || pText[start - 1] == TEXT('_'))) start--;
+        while (end < textLen && (IsCharAlphaNumeric(pText[end]) || pText[end] == TEXT('_'))) end++;
+        
+        /* Include trailing whitespace, or leading if at end of line */
+        DWORD origEnd = end;
+        while (end < textLen && (pText[end] == TEXT(' ') || pText[end] == TEXT('\t'))) end++;
+        
+        /* If no trailing whitespace, include leading */
+        if (end == origEnd) {
+            while (start > 0 && (pText[start - 1] == TEXT(' ') || pText[start - 1] == TEXT('\t'))) start--;
+        }
+        
+        range.dwStart = start;
+        range.dwEnd = end;
+        range.bFound = TRUE;
+    }
+    
+    FreeTextBuffer(pText);
+    return range;
+}
+
+/* Select inner quote (i" or i') */
+TextObjectRange VimSelectInnerQuote(HWND hwndEdit, TCHAR chQuote) {
+    TextObjectRange range = {0, 0, FALSE};
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (!pText || textLen == 0) return range;
+    
+    DWORD pos = GetEditCursorPos(hwndEdit);
+    int line = GetLineFromChar(hwndEdit, pos);
+    DWORD lineStart = GetLineIndex(hwndEdit, line);
+    int lineLen = GetLineLen(hwndEdit, line);
+    DWORD lineEnd = lineStart + lineLen;
+    
+    /* Find opening quote (search backward then forward) */
+    DWORD openQuote = (DWORD)-1;
+    DWORD closeQuote = (DWORD)-1;
+    
+    /* First, check if we're inside quotes by counting quotes before cursor */
+    int quoteCount = 0;
+    for (DWORD i = lineStart; i < pos; i++) {
+        if (pText[i] == chQuote) quoteCount++;
+    }
+    
+    if (quoteCount % 2 == 1) {
+        /* We're inside quotes - find the opening quote */
+        for (DWORD i = pos; i > lineStart; i--) {
+            if (pText[i - 1] == chQuote) {
+                openQuote = i - 1;
+                break;
+            }
+        }
+        /* Find closing quote */
+        for (DWORD i = pos; i < lineEnd; i++) {
+            if (pText[i] == chQuote) {
+                closeQuote = i;
+                break;
+            }
+        }
+    } else {
+        /* We're outside quotes - find next pair */
+        for (DWORD i = pos; i < lineEnd; i++) {
+            if (pText[i] == chQuote) {
+                if (openQuote == (DWORD)-1) {
+                    openQuote = i;
+                } else {
+                    closeQuote = i;
+                    break;
+                }
+            }
+        }
+    }
+    
+    if (openQuote != (DWORD)-1 && closeQuote != (DWORD)-1 && closeQuote > openQuote) {
+        range.dwStart = openQuote + 1;
+        range.dwEnd = closeQuote;
+        range.bFound = TRUE;
+    }
+    
+    FreeTextBuffer(pText);
+    return range;
+}
+
+/* Select a quote including quotes (a" or a') */
+TextObjectRange VimSelectAQuote(HWND hwndEdit, TCHAR chQuote) {
+    TextObjectRange range = VimSelectInnerQuote(hwndEdit, chQuote);
+    if (range.bFound) {
+        /* Include the quotes */
+        if (range.dwStart > 0) range.dwStart--;
+        range.dwEnd++;
+    }
+    return range;
+}
+
+/* Select inner bracket (i(, i), i{, i}, i[, i], i<, i>) */
+TextObjectRange VimSelectInnerBracket(HWND hwndEdit, TCHAR chOpen, TCHAR chClose) {
+    TextObjectRange range = {0, 0, FALSE};
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (!pText || textLen == 0) return range;
+    
+    DWORD pos = GetEditCursorPos(hwndEdit);
+    
+    /* Find matching brackets */
+    DWORD openBracket = (DWORD)-1;
+    DWORD closeBracket = (DWORD)-1;
+    int depth = 0;
+    
+    /* Search backward for opening bracket */
+    for (DWORD i = pos; ; i--) {
+        if (pText[i] == chClose) depth++;
+        else if (pText[i] == chOpen) {
+            if (depth == 0) {
+                openBracket = i;
+                break;
+            }
+            depth--;
+        }
+        if (i == 0) break;
+    }
+    
+    /* Search forward for closing bracket */
+    if (openBracket != (DWORD)-1) {
+        depth = 0;
+        for (DWORD i = openBracket + 1; i < textLen; i++) {
+            if (pText[i] == chOpen) depth++;
+            else if (pText[i] == chClose) {
+                if (depth == 0) {
+                    closeBracket = i;
+                    break;
+                }
+                depth--;
+            }
+        }
+    }
+    
+    if (openBracket != (DWORD)-1 && closeBracket != (DWORD)-1) {
+        range.dwStart = openBracket + 1;
+        range.dwEnd = closeBracket;
+        range.bFound = TRUE;
+    }
+    
+    FreeTextBuffer(pText);
+    return range;
+}
+
+/* Select a bracket including brackets (a(, a), a{, a}, a[, a], a<, a>) */
+TextObjectRange VimSelectABracket(HWND hwndEdit, TCHAR chOpen, TCHAR chClose) {
+    TextObjectRange range = VimSelectInnerBracket(hwndEdit, chOpen, chClose);
+    if (range.bFound) {
+        /* Include the brackets */
+        if (range.dwStart > 0) range.dwStart--;
+        range.dwEnd++;
+    }
+    return range;
+}
+
+/* Apply operator to text object range */
+void VimApplyTextObject(HWND hwndEdit, TCHAR chOp, TextObjectRange range) {
+    if (!range.bFound) return;
+    
+    /* Select the range */
+    SendMessage(hwndEdit, EM_SETSEL, range.dwStart, range.dwEnd);
+    
+    switch (chOp) {
+        case TEXT('d'):
+        case TEXT('x'):
+            /* Delete */
+            SendMessage(hwndEdit, WM_COPY, 0, 0);
+            SendMessage(hwndEdit, EM_REPLACESEL, TRUE, (LPARAM)TEXT(""));
+            g_VimState.bRegisterIsLine = FALSE;
+            break;
+        case TEXT('y'):
+            /* Yank */
+            SendMessage(hwndEdit, WM_COPY, 0, 0);
+            SetEditCursorPos(hwndEdit, range.dwStart);
+            g_VimState.bRegisterIsLine = FALSE;
+            break;
+        case TEXT('c'):
+            /* Change */
+            SendMessage(hwndEdit, WM_COPY, 0, 0);
+            SendMessage(hwndEdit, EM_REPLACESEL, TRUE, (LPARAM)TEXT(""));
+            g_VimState.bRegisterIsLine = FALSE;
+            g_VimState.mode = VIM_MODE_INSERT;
+            break;
+    }
+}
+
 void VimPageDown(HWND hwndEdit, int count) {
     for (int i = 0; i < count; i++) SendMessage(hwndEdit, EM_SCROLL, SB_PAGEDOWN, 0);
     int firstLine = (int)SendMessage(hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
@@ -538,15 +1069,69 @@ void VimFindCharBackward(HWND hwndEdit, TCHAR ch, int count) {
 }
 
 void VimFindCharTillForward(HWND hwndEdit, TCHAR ch, int count) {
-    VimFindCharForward(hwndEdit, ch, count);
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (!pText) return;
+    
     DWORD pos = GetEditCursorPos(hwndEdit);
-    if (pos > 0) SetEditCursorPos(hwndEdit, pos - 1);
+    DWORD origPos = pos;
+    int line = GetLineFromChar(hwndEdit, pos);
+    DWORD lineStart = GetLineIndex(hwndEdit, line);
+    int lineLen = GetLineLen(hwndEdit, line);
+    DWORD lineEnd = lineStart + lineLen;
+    
+    int found = 0;
+    for (DWORD i = pos + 1; i < lineEnd && found < count; i++) {
+        if (pText[i] == ch) {
+            pos = i;
+            found++;
+        }
+    }
+    FreeTextBuffer(pText);
+    
+    /* Only move if found, and stop one character before target */
+    if (found > 0 && pos > origPos) {
+        DWORD newPos = pos - 1;
+        if (newPos > origPos) {
+            if (g_VimState.mode == VIM_MODE_VISUAL) {
+                UpdateVisualSelection(hwndEdit, newPos);
+            } else {
+                SetEditCursorPos(hwndEdit, newPos);
+            }
+        }
+    }
 }
 
 void VimFindCharTillBackward(HWND hwndEdit, TCHAR ch, int count) {
-    VimFindCharBackward(hwndEdit, ch, count);
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (!pText) return;
+    
     DWORD pos = GetEditCursorPos(hwndEdit);
-    SetEditCursorPos(hwndEdit, pos + 1);
+    DWORD origPos = pos;
+    int line = GetLineFromChar(hwndEdit, pos);
+    DWORD lineStart = GetLineIndex(hwndEdit, line);
+    
+    int found = 0;
+    for (DWORD i = pos; i > lineStart && found < count; i--) {
+        if (pText[i - 1] == ch) {
+            pos = i - 1;
+            found++;
+        }
+    }
+    FreeTextBuffer(pText);
+    
+    /* Only move if found, and stop one character after target */
+    if (found > 0 && pos < origPos) {
+        DWORD newPos = pos + 1;
+        if (newPos < origPos) {
+            if (g_VimState.mode == VIM_MODE_VISUAL) {
+                UpdateVisualSelection(hwndEdit, newPos);
+            } else {
+                SetEditCursorPos(hwndEdit, newPos);
+            }
+        }
+    }
 }
 
 /* ============ Additional Motions ============ */
@@ -554,33 +1139,87 @@ void VimFindCharTillBackward(HWND hwndEdit, TCHAR ch, int count) {
 void VimMoveMatchingBracket(HWND hwndEdit) {
     DWORD textLen;
     TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
-    if (!pText) return;
+    if (!pText || textLen == 0) return;
     
     DWORD pos = GetEditCursorPos(hwndEdit);
+    if (pos >= textLen) {
+        FreeTextBuffer(pText);
+        return;
+    }
+    
     TCHAR ch = pText[pos];
-    TCHAR match = 0;
+    TCHAR openBracket = 0;
+    TCHAR closeBracket = 0;
     int dir = 0;
     
+    /* Determine bracket type and direction */
     switch (ch) {
-        case TEXT('('): match = TEXT(')'); dir = 1; break;
-        case TEXT(')'): match = TEXT('('); dir = -1; break;
-        case TEXT('['): match = TEXT(']'); dir = 1; break;
-        case TEXT(']'): match = TEXT('['); dir = -1; break;
-        case TEXT('{'): match = TEXT('}'); dir = 1; break;
-        case TEXT('}'): match = TEXT('{'); dir = -1; break;
+        case TEXT('('): openBracket = TEXT('('); closeBracket = TEXT(')'); dir = 1; break;
+        case TEXT(')'): openBracket = TEXT('('); closeBracket = TEXT(')'); dir = -1; break;
+        case TEXT('['): openBracket = TEXT('['); closeBracket = TEXT(']'); dir = 1; break;
+        case TEXT(']'): openBracket = TEXT('['); closeBracket = TEXT(']'); dir = -1; break;
+        case TEXT('{'): openBracket = TEXT('{'); closeBracket = TEXT('}'); dir = 1; break;
+        case TEXT('}'): openBracket = TEXT('{'); closeBracket = TEXT('}'); dir = -1; break;
+        default:
+            /* If not on a bracket, search forward for one on this line */
+            {
+                int line = GetLineFromChar(hwndEdit, pos);
+                DWORD lineStart = GetLineIndex(hwndEdit, line);
+                int lineLen = GetLineLen(hwndEdit, line);
+                DWORD lineEnd = lineStart + lineLen;
+                
+                for (DWORD i = pos; i < lineEnd; i++) {
+                    TCHAR c = pText[i];
+                    if (c == TEXT('(') || c == TEXT('[') || c == TEXT('{') ||
+                        c == TEXT(')') || c == TEXT(']') || c == TEXT('}')) {
+                        pos = i;
+                        ch = c;
+                        switch (ch) {
+                            case TEXT('('): openBracket = TEXT('('); closeBracket = TEXT(')'); dir = 1; break;
+                            case TEXT(')'): openBracket = TEXT('('); closeBracket = TEXT(')'); dir = -1; break;
+                            case TEXT('['): openBracket = TEXT('['); closeBracket = TEXT(']'); dir = 1; break;
+                            case TEXT(']'): openBracket = TEXT('['); closeBracket = TEXT(']'); dir = -1; break;
+                            case TEXT('{'): openBracket = TEXT('{'); closeBracket = TEXT('}'); dir = 1; break;
+                            case TEXT('}'): openBracket = TEXT('{'); closeBracket = TEXT('}'); dir = -1; break;
+                        }
+                        break;
+                    }
+                }
+            }
+            break;
     }
     
     if (dir != 0) {
         int depth = 1;
-        DWORD i = pos + dir;
-        while (i > 0 && i < textLen && depth > 0) {
-            if (pText[i] == ch) depth++;
-            else if (pText[i] == match) depth--;
+        DWORD i = pos;
+        
+        /* Move in the specified direction */
+        while (TRUE) {
+            if (dir > 0) {
+                i++;
+                if (i >= textLen) break;
+            } else {
+                if (i == 0) break;
+                i--;
+            }
+            
+            TCHAR c = pText[i];
+            if (c == openBracket) {
+                if (dir > 0) depth++;
+                else depth--;
+            } else if (c == closeBracket) {
+                if (dir > 0) depth--;
+                else depth++;
+            }
+            
             if (depth == 0) {
-                SetEditCursorPos(hwndEdit, i);
+                if (g_VimState.mode == VIM_MODE_VISUAL) {
+                    UpdateVisualSelection(hwndEdit, i);
+                } else {
+                    SetEditCursorPos(hwndEdit, i);
+                }
                 break;
             }
-            i += dir;
         }
     }
     FreeTextBuffer(pText);
@@ -593,19 +1232,51 @@ void VimMoveParagraphForward(HWND hwndEdit, int count) {
     
     DWORD pos = GetEditCursorPos(hwndEdit);
     int found = 0;
+    BOOL wasOnEmptyLine = FALSE;
     
-    while (pos < textLen && found < count) {
-        /* Skip non-empty lines */
+    /* Check if we're starting on an empty line */
+    if (pos < textLen && (pText[pos] == TEXT('\r') || pText[pos] == TEXT('\n'))) {
+        wasOnEmptyLine = TRUE;
+    }
+    
+    while (found < count && pos < textLen) {
+        if (wasOnEmptyLine) {
+            /* Skip empty lines first */
+            while (pos < textLen && (pText[pos] == TEXT('\r') || pText[pos] == TEXT('\n'))) pos++;
+            wasOnEmptyLine = FALSE;
+        }
+        
+        /* Skip non-empty content until we hit an empty line */
         while (pos < textLen && pText[pos] != TEXT('\r') && pText[pos] != TEXT('\n')) pos++;
-        /* Skip newlines */
-        while (pos < textLen && (pText[pos] == TEXT('\r') || pText[pos] == TEXT('\n'))) pos++;
-        /* Check if next line is empty (paragraph boundary) */
-        if (pos < textLen && (pText[pos] == TEXT('\r') || pText[pos] == TEXT('\n'))) {
+        
+        /* Skip the newline characters */
+        while (pos < textLen && (pText[pos] == TEXT('\r') || pText[pos] == TEXT('\n'))) {
+            pos++;
+            /* Check if this is an empty line (paragraph boundary) */
+            if (pos < textLen && (pText[pos] == TEXT('\r') || pText[pos] == TEXT('\n'))) {
+                found++;
+                break;
+            }
+            /* Also count reaching end of file as a paragraph boundary */
+            if (pos >= textLen) {
+                found++;
+                break;
+            }
+        }
+        
+        /* If we reached end of file, count it */
+        if (pos >= textLen && found < count) {
             found++;
         }
     }
+    
     FreeTextBuffer(pText);
-    SetEditCursorPos(hwndEdit, pos);
+    
+    if (g_VimState.mode == VIM_MODE_VISUAL) {
+        UpdateVisualSelection(hwndEdit, pos);
+    } else {
+        SetEditCursorPos(hwndEdit, pos);
+    }
 }
 
 void VimMoveParagraphBackward(HWND hwndEdit, int count) {
@@ -616,19 +1287,46 @@ void VimMoveParagraphBackward(HWND hwndEdit, int count) {
     DWORD pos = GetEditCursorPos(hwndEdit);
     int found = 0;
     
-    while (pos > 0 && found < count) {
-        pos--;
-        /* Skip newlines */
+    while (found < count && pos > 0) {
+        /* Move back one character */
+        if (pos > 0) pos--;
+        
+        /* Skip any newlines we're on */
         while (pos > 0 && (pText[pos] == TEXT('\r') || pText[pos] == TEXT('\n'))) pos--;
-        /* Skip non-empty lines */
+        
+        /* Skip non-empty content backward */
         while (pos > 0 && pText[pos] != TEXT('\r') && pText[pos] != TEXT('\n')) pos--;
-        /* Check if previous line is empty */
-        if (pos > 0 && (pText[pos - 1] == TEXT('\r') || pText[pos - 1] == TEXT('\n'))) {
+        
+        /* Now we're at a newline or start of file */
+        if (pos == 0) {
             found++;
+        } else {
+            /* Check if the previous character is also a newline (empty line = paragraph boundary) */
+            if (pText[pos] == TEXT('\r') || pText[pos] == TEXT('\n')) {
+                /* Move to start of empty line */
+                while (pos > 0 && (pText[pos - 1] == TEXT('\r') || pText[pos - 1] == TEXT('\n'))) {
+                    pos--;
+                }
+                found++;
+            }
         }
     }
+    
+    /* Position at start of line after empty line */
+    if (pos > 0 && (pText[pos] == TEXT('\r') || pText[pos] == TEXT('\n'))) {
+        pos++;
+        if (pos < textLen && pText[pos] == TEXT('\n') && pText[pos-1] == TEXT('\r')) {
+            pos++;
+        }
+    }
+    
     FreeTextBuffer(pText);
-    SetEditCursorPos(hwndEdit, pos);
+    
+    if (g_VimState.mode == VIM_MODE_VISUAL) {
+        UpdateVisualSelection(hwndEdit, pos);
+    } else {
+        SetEditCursorPos(hwndEdit, pos);
+    }
 }
 
 /* ============ Edit Commands ============ */
@@ -657,6 +1355,20 @@ void VimDeleteLine(HWND hwndEdit, int count) {
     DWORD startPos = GetLineIndex(hwndEdit, line);
     DWORD endPos = (endLine < totalLines) ? GetLineIndex(hwndEdit, endLine) : GetTextLen(hwndEdit);
     
+    /* Store deleted content in register */
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (pText && endPos > startPos) {
+        DWORD copyLen = endPos - startPos;
+        if (copyLen >= sizeof(g_VimState.szRegister) / sizeof(TCHAR)) {
+            copyLen = sizeof(g_VimState.szRegister) / sizeof(TCHAR) - 1;
+        }
+        _tcsncpy_s(g_VimState.szRegister, sizeof(g_VimState.szRegister) / sizeof(TCHAR), 
+                   pText + startPos, copyLen);
+        g_VimState.bRegisterIsLine = TRUE;  /* Mark as line-mode content */
+        FreeTextBuffer(pText);
+    }
+    
     SendMessage(hwndEdit, EM_SETSEL, startPos, endPos);
     SendMessage(hwndEdit, WM_COPY, 0, 0);
     SendMessage(hwndEdit, EM_REPLACESEL, TRUE, (LPARAM)TEXT(""));
@@ -683,17 +1395,59 @@ void VimYankLine(HWND hwndEdit, int count) {
     DWORD startPos = GetLineIndex(hwndEdit, line);
     DWORD endPos = (endLine < totalLines) ? GetLineIndex(hwndEdit, endLine) : GetTextLen(hwndEdit);
     
+    /* Store yanked content in register */
+    DWORD textLen;
+    TCHAR* pText = GetTextBuffer(hwndEdit, &textLen);
+    if (pText && endPos > startPos) {
+        DWORD copyLen = endPos - startPos;
+        if (copyLen >= sizeof(g_VimState.szRegister) / sizeof(TCHAR)) {
+            copyLen = sizeof(g_VimState.szRegister) / sizeof(TCHAR) - 1;
+        }
+        _tcsncpy_s(g_VimState.szRegister, sizeof(g_VimState.szRegister) / sizeof(TCHAR), 
+                   pText + startPos, copyLen);
+        g_VimState.bRegisterIsLine = TRUE;  /* Mark as line-mode content */
+        FreeTextBuffer(pText);
+    }
+    
     SendMessage(hwndEdit, EM_SETSEL, startPos, endPos);
     SendMessage(hwndEdit, WM_COPY, 0, 0);
     SendMessage(hwndEdit, EM_SETSEL, pos, pos);
 }
 
-void VimPaste(HWND hwndEdit) { SendMessage(hwndEdit, WM_PASTE, 0, 0); }
+/* Paste after cursor (p) - for line-mode paste, paste on new line below */
+void VimPaste(HWND hwndEdit) {
+    if (g_VimState.bRegisterIsLine) {
+        /* Line-mode paste: paste on new line below current line */
+        VimMoveLineEnd(hwndEdit);
+        SendMessage(hwndEdit, EM_REPLACESEL, TRUE, (LPARAM)TEXT("\r\n"));
+        SendMessage(hwndEdit, WM_PASTE, 0, 0);
+    } else {
+        /* Character-mode paste: paste after cursor */
+        DWORD pos = GetEditCursorPos(hwndEdit);
+        int line = GetLineFromChar(hwndEdit, pos);
+        DWORD lineStart = GetLineIndex(hwndEdit, line);
+        int lineLen = GetLineLen(hwndEdit, line);
+        /* Only move right if not at end of line */
+        if (pos < lineStart + lineLen) {
+            SetEditCursorPos(hwndEdit, pos + 1);
+        }
+        SendMessage(hwndEdit, WM_PASTE, 0, 0);
+    }
+}
 
+/* Paste before cursor (P) - for line-mode paste, paste on new line above */
 void VimPasteBefore(HWND hwndEdit) {
-    DWORD pos = GetEditCursorPos(hwndEdit);
-    if (pos > 0) SetEditCursorPos(hwndEdit, pos - 1);
-    SendMessage(hwndEdit, WM_PASTE, 0, 0);
+    if (g_VimState.bRegisterIsLine) {
+        /* Line-mode paste: paste on new line above current line */
+        VimMoveLineStart(hwndEdit);
+        DWORD pos = GetEditCursorPos(hwndEdit);
+        SendMessage(hwndEdit, EM_REPLACESEL, TRUE, (LPARAM)TEXT("\r\n"));
+        SetEditCursorPos(hwndEdit, pos);
+        SendMessage(hwndEdit, WM_PASTE, 0, 0);
+    } else {
+        /* Character-mode paste: paste at cursor position (before cursor) */
+        SendMessage(hwndEdit, WM_PASTE, 0, 0);
+    }
 }
 
 void VimUndo(HWND hwndEdit) { SendMessage(hwndEdit, EM_UNDO, 0, 0); }
@@ -1162,6 +1916,55 @@ void VimExecuteCommand(HWND hwndMain, HWND hwndEdit) {
         /* Go to last line */
         VimMoveLastLine(hwndEdit);
     }
+    /* Buffer navigation commands */
+    else if (_tcscmp(cmd, TEXT("bn")) == 0 || _tcscmp(cmd, TEXT("bnext")) == 0) {
+        if (g_AppState.nTabCount > 1) {
+            int nNext = (g_AppState.nCurrentTab + 1) % g_AppState.nTabCount;
+            SwitchToTab(hwndMain, nNext);
+        }
+    }
+    else if (_tcscmp(cmd, TEXT("bp")) == 0 || _tcscmp(cmd, TEXT("bprev")) == 0 || 
+             _tcscmp(cmd, TEXT("bN")) == 0 || _tcscmp(cmd, TEXT("bNext")) == 0) {
+        if (g_AppState.nTabCount > 1) {
+            int nPrev = (g_AppState.nCurrentTab - 1 + g_AppState.nTabCount) % g_AppState.nTabCount;
+            SwitchToTab(hwndMain, nPrev);
+        }
+    }
+    else if (_tcscmp(cmd, TEXT("bd")) == 0 || _tcscmp(cmd, TEXT("bdelete")) == 0) {
+        CloseTab(hwndMain, g_AppState.nCurrentTab);
+    }
+    else if (_tcscmp(cmd, TEXT("bd!")) == 0 || _tcscmp(cmd, TEXT("bdelete!")) == 0) {
+        TabState* pTab = GetCurrentTabState();
+        if (pTab) pTab->bModified = FALSE;
+        CloseTab(hwndMain, g_AppState.nCurrentTab);
+    }
+    /* Utility commands */
+    else if (_tcscmp(cmd, TEXT("noh")) == 0 || _tcscmp(cmd, TEXT("nohlsearch")) == 0) {
+        /* Clear search highlighting - just clear the pattern */
+        g_VimState.szSearchPattern[0] = TEXT('\0');
+    }
+    else if (_tcscmp(cmd, TEXT("sp")) == 0 || _tcscmp(cmd, TEXT("split")) == 0) {
+        MessageBox(hwndMain, TEXT("Split windows are not supported in XNote.\nUse tabs instead (:tabnew)"), 
+                   TEXT("Vim"), MB_OK | MB_ICONINFORMATION);
+    }
+    else if (_tcscmp(cmd, TEXT("vs")) == 0 || _tcscmp(cmd, TEXT("vsplit")) == 0) {
+        MessageBox(hwndMain, TEXT("Vertical split is not supported in XNote.\nUse tabs instead (:tabnew)"), 
+                   TEXT("Vim"), MB_OK | MB_ICONINFORMATION);
+    }
+    else if (_tcscmp(cmd, TEXT("help")) == 0 || _tcscmp(cmd, TEXT("h")) == 0) {
+        MessageBox(hwndMain, 
+            TEXT("XNote Vim Mode Commands:\n\n")
+            TEXT("Navigation: h j k l w b e W B E 0 $ ^ gg G H M L { } % f F t T\n")
+            TEXT("Edit: i a I A o O x X d c y p P u J r s S C D Y ~\n")
+            TEXT("Visual: v V\n")
+            TEXT("Search: / ? n N * #\n")
+            TEXT("Scroll: Ctrl+D Ctrl+U Ctrl+F Ctrl+B zz zt zb\n\n")
+            TEXT("Ex Commands:\n")
+            TEXT(":w :q :wq :x :e :tabnew :tabn :tabp :bn :bp :bd\n")
+            TEXT(":set nu :set nonu :set rnu :set nornu :set wrap :set nowrap\n")
+            TEXT(":{number} - go to line"),
+            TEXT("Vim Help"), MB_OK | MB_ICONINFORMATION);
+    }
     else if (_tcslen(cmd) > 0) {
         /* Unknown command */
         TCHAR szMsg[300];
@@ -1404,6 +2207,63 @@ BOOL ProcessVimKey(HWND hwndEdit, UINT msg, WPARAM wParam, LPARAM lParam) {
         
         /* Handle pending operator */
         if (g_VimState.chPendingOp) {
+            /* Handle text objects: i{obj} or a{obj} */
+            if (g_VimState.chPendingOp == TEXT('d') || g_VimState.chPendingOp == TEXT('y') || 
+                g_VimState.chPendingOp == TEXT('c')) {
+                if (ch == TEXT('i') || ch == TEXT('a')) {
+                    /* Store the inner/around modifier and wait for object type */
+                    g_VimState.szLastCommand[0] = g_VimState.chPendingOp;
+                    g_VimState.szLastCommand[1] = ch;
+                    g_VimState.szLastCommand[2] = TEXT('\0');
+                    g_VimState.chPendingOp = (ch == TEXT('i')) ? TEXT('I') : TEXT('A'); /* Use I/A as markers */
+                    return TRUE;
+                }
+            }
+            
+            /* Handle text object type after i or a */
+            if (g_VimState.chPendingOp == TEXT('I') || g_VimState.chPendingOp == TEXT('A')) {
+                TCHAR chOp = g_VimState.szLastCommand[0];
+                BOOL bInner = (g_VimState.chPendingOp == TEXT('I'));
+                TextObjectRange range = {0, 0, FALSE};
+                
+                switch (ch) {
+                    case TEXT('w'):
+                        range = bInner ? VimSelectInnerWord(hwndEdit) : VimSelectAWord(hwndEdit);
+                        break;
+                    case TEXT('"'):
+                        range = bInner ? VimSelectInnerQuote(hwndEdit, TEXT('"')) : VimSelectAQuote(hwndEdit, TEXT('"'));
+                        break;
+                    case TEXT('\''):
+                        range = bInner ? VimSelectInnerQuote(hwndEdit, TEXT('\'')) : VimSelectAQuote(hwndEdit, TEXT('\''));
+                        break;
+                    case TEXT('('):
+                    case TEXT(')'):
+                    case TEXT('b'):
+                        range = bInner ? VimSelectInnerBracket(hwndEdit, TEXT('('), TEXT(')')) : VimSelectABracket(hwndEdit, TEXT('('), TEXT(')'));
+                        break;
+                    case TEXT('{'):
+                    case TEXT('}'):
+                    case TEXT('B'):
+                        range = bInner ? VimSelectInnerBracket(hwndEdit, TEXT('{'), TEXT('}')) : VimSelectABracket(hwndEdit, TEXT('{'), TEXT('}'));
+                        break;
+                    case TEXT('['):
+                    case TEXT(']'):
+                        range = bInner ? VimSelectInnerBracket(hwndEdit, TEXT('['), TEXT(']')) : VimSelectABracket(hwndEdit, TEXT('['), TEXT(']'));
+                        break;
+                    case TEXT('<'):
+                    case TEXT('>'):
+                        range = bInner ? VimSelectInnerBracket(hwndEdit, TEXT('<'), TEXT('>')) : VimSelectABracket(hwndEdit, TEXT('<'), TEXT('>'));
+                        break;
+                }
+                
+                if (range.bFound) {
+                    VimApplyTextObject(hwndEdit, chOp, range);
+                }
+                g_VimState.chPendingOp = 0;
+                g_VimState.nRepeatCount = 0;
+                return TRUE;
+            }
+            
             switch (g_VimState.chPendingOp) {
                 case TEXT('d'):
                     if (ch == TEXT('d')) VimDeleteLine(hwndEdit, count);
@@ -1451,6 +2311,14 @@ BOOL ProcessVimKey(HWND hwndEdit, UINT msg, WPARAM wParam, LPARAM lParam) {
                     break;
                 case TEXT('g'):
                     if (ch == TEXT('g')) VimMoveFirstLine(hwndEdit);
+                    else if (ch == TEXT('e')) {
+                        /* ge - move to end of previous word */
+                        VimMoveWordEndBackward(hwndEdit, count);
+                    }
+                    else if (ch == TEXT('E')) {
+                        /* gE - move to end of previous WORD */
+                        VimMoveWORDEndBackward(hwndEdit, count);
+                    }
                     else if (ch == TEXT('t')) {
                         /* gt - next tab */
                         if (g_AppState.nTabCount > 1) {
@@ -1479,6 +2347,10 @@ BOOL ProcessVimKey(HWND hwndEdit, UINT msg, WPARAM wParam, LPARAM lParam) {
                         /* g$ - last tab */
                         SwitchToTab(g_VimState.hwndMain, g_AppState.nTabCount - 1);
                     }
+                    break;
+                case TEXT('r'):
+                    /* r{char} - replace character under cursor */
+                    VimReplaceChar(hwndEdit, ch);
                     break;
                 case TEXT('z'):
                     if (ch == TEXT('z')) {
@@ -1531,10 +2403,11 @@ BOOL ProcessVimKey(HWND hwndEdit, UINT msg, WPARAM wParam, LPARAM lParam) {
             case TEXT('j'): VimMoveDown(hwndEdit, count); break;
             case TEXT('k'): VimMoveUp(hwndEdit, count); break;
             case TEXT('w'): VimMoveWordForward(hwndEdit, count); break;
-            case TEXT('W'): VimMoveWordForward(hwndEdit, count); break;
+            case TEXT('W'): VimMoveWORDForward(hwndEdit, count); break;
             case TEXT('b'): VimMoveWordBackward(hwndEdit, count); break;
-            case TEXT('B'): VimMoveWordBackward(hwndEdit, count); break;
+            case TEXT('B'): VimMoveWORDBackward(hwndEdit, count); break;
             case TEXT('e'): VimMoveWordEnd(hwndEdit, count); break;
+            case TEXT('E'): VimMoveWORDEnd(hwndEdit, count); break;
             case TEXT('0'): VimMoveLineStart(hwndEdit); break;
             case TEXT('$'): VimMoveLineEnd(hwndEdit); break;
             case TEXT('^'): VimMoveFirstNonBlank(hwndEdit); break;
@@ -1546,31 +2419,12 @@ BOOL ProcessVimKey(HWND hwndEdit, UINT msg, WPARAM wParam, LPARAM lParam) {
             case TEXT('%'): VimMoveMatchingBracket(hwndEdit); break;
             case TEXT('{'): VimMoveParagraphBackward(hwndEdit, count); break;
             case TEXT('}'): VimMoveParagraphForward(hwndEdit, count); break;
-            case TEXT('H'): {
-                /* Move to top of screen */
-                int firstLine = (int)SendMessage(hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
-                VimMoveToLine(hwndEdit, firstLine + 1);
-                break;
-            }
-            case TEXT('M'): {
-                /* Move to middle of screen */
-                RECT rc; GetClientRect(hwndEdit, &rc);
-                int visibleLines = (rc.bottom - rc.top) / 16;
-                int firstLine = (int)SendMessage(hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
-                VimMoveToLine(hwndEdit, firstLine + visibleLines / 2 + 1);
-                break;
-            }
-            case TEXT('L'): {
-                /* Move to bottom of screen */
-                RECT rc; GetClientRect(hwndEdit, &rc);
-                int visibleLines = (rc.bottom - rc.top) / 16;
-                int firstLine = (int)SendMessage(hwndEdit, EM_GETFIRSTVISIBLELINE, 0, 0);
-                int totalLines = GetLineCount(hwndEdit);
-                int targetLine = firstLine + visibleLines;
-                if (targetLine > totalLines) targetLine = totalLines;
-                VimMoveToLine(hwndEdit, targetLine);
-                break;
-            }
+            case TEXT('H'): VimMoveScreenTop(hwndEdit); break;
+            case TEXT('M'): VimMoveScreenMiddle(hwndEdit); break;
+            case TEXT('L'): VimMoveScreenBottom(hwndEdit); break;
+            case TEXT('+'): VimMoveNextLineFirstNonBlank(hwndEdit, count); break;
+            case TEXT('-'): VimMovePrevLineFirstNonBlank(hwndEdit, count); break;
+            case 13: /* Enter key */ VimMoveNextLineFirstNonBlank(hwndEdit, count); break;
             
             /* Find character on line */
             case TEXT('f'): g_chPendingFind = TEXT('f'); g_bFindForward = TRUE; g_bFindTill = FALSE; return TRUE;
@@ -1596,7 +2450,8 @@ BOOL ProcessVimKey(HWND hwndEdit, UINT msg, WPARAM wParam, LPARAM lParam) {
             case TEXT('>'): g_VimState.chPendingOp = TEXT('>'); return TRUE;
             case TEXT('<'): g_VimState.chPendingOp = TEXT('<'); return TRUE;
             case TEXT('z'): g_VimState.chPendingOp = TEXT('z'); return TRUE;
-            case TEXT('r'): /* Replace char - need pending */ return TRUE;
+            case TEXT('r'): g_VimState.chPendingOp = TEXT('r'); return TRUE;
+            case TEXT('~'): VimToggleCase(hwndEdit); break;
             
             /* Mode transitions */
             case TEXT('i'): VimEnterInsertMode(hwndEdit); break;

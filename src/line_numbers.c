@@ -220,6 +220,10 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
                     nCurrentLine = (int)SendMessage(hwndEdit, EM_LINEFROMCHAR, dwCursorPos, 0);
                 }
                 
+                /* Pre-calculate colors for relative line numbers */
+                COLORREF crCurrentLine = pTheme->crForeground;  /* Use theme text color for current line */
+                COLORREF crRelativeLine = pTheme->crLineNumber;  /* Use theme line number color */
+                
                 /* Draw visible lines using calculated positions */
                 for (int i = 0; i < nVisibleLines; i++) {
                     int nLine = nFirstVisible + i;
@@ -235,10 +239,10 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
                     if (g_AppState.bRelativeLineNumbers) {
                         if (nLine == nCurrentLine) {
                             nDisplayNum = nLine + 1;
-                            SetTextColor(hdc, RGB(0, 0, 0));
+                            SetTextColor(hdc, crCurrentLine);
                         } else {
                             nDisplayNum = abs(nLine - nCurrentLine);
-                            SetTextColor(hdc, RGB(100, 100, 100));
+                            SetTextColor(hdc, crRelativeLine);
                         }
                     } else {
                         nDisplayNum = nLine + 1;
@@ -325,13 +329,17 @@ LRESULT CALLBACK LineNumberWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
                     int nLineNum = nLogicalLine + 1;
                     int nDisplayNum;
                     
+                    /* Use theme colors instead of hardcoded values */
+                    COLORREF crCurrentLine = pTheme->crForeground;
+                    COLORREF crRelativeLine = pTheme->crLineNumber;
+                    
                     if (g_AppState.bRelativeLineNumbers) {
                         if (nLogicalLine == nCurrentLogicalLine) {
                             nDisplayNum = nLineNum;
-                            SetTextColor(hdc, RGB(0, 0, 0));
+                            SetTextColor(hdc, crCurrentLine);
                         } else {
                             nDisplayNum = abs(nLogicalLine - nCurrentLogicalLine);
-                            SetTextColor(hdc, RGB(100, 100, 100));
+                            SetTextColor(hdc, crRelativeLine);
                         }
                     } else {
                         nDisplayNum = nLineNum;
@@ -451,8 +459,8 @@ void ToggleLineNumbers(HWND hwnd) {
             
             ShowWindow(pTab->lineNumState.hwndLineNumbers, SW_SHOW);
             
-            /* Start periodic sync timer - 50ms for smooth sync */
-            SetTimer(hwnd, 2, 50, NULL);
+            /* Start periodic sync timer - 100ms is sufficient and reduces CPU usage */
+            SetTimer(hwnd, 2, 100, NULL);
         } else {
             pTab->lineNumState.bShowLineNumbers = FALSE;
             if (pTab->lineNumState.hwndLineNumbers) {
