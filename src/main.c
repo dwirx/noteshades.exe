@@ -4,6 +4,7 @@
 #include "session.h"
 #include "theme.h"
 #include <richedit.h>
+#include <windowsx.h>  /* For GET_X_LPARAM, GET_Y_LPARAM macros */
 
 /* Global application state */
 AppState g_AppState = {0};
@@ -198,12 +199,34 @@ static BOOL g_bTrackingMouse = FALSE;
 /* Original tab control window procedure */
 static WNDPROC g_OrigTabProc = NULL;
 
+/* Helper function to check if point is in close button area */
+static BOOL IsPointInCloseButton(HWND hwndTab, int nTab, POINT pt) {
+    if (nTab < 0) return FALSE;
+    
+    RECT rcItem;
+    if (!TabCtrl_GetItemRect(hwndTab, nTab, &rcItem)) return FALSE;
+    
+    /* Close button rectangle - must match the drawing code in WM_DRAWITEM
+     * Close button is drawn at: right - 4 - CLOSE_BTN_SIZE to right - 4
+     * Vertically centered in the tab */
+    RECT rcClose;
+    rcClose.right = rcItem.right - 4;
+    rcClose.left = rcClose.right - CLOSE_BTN_SIZE;
+    rcClose.top = rcItem.top + (rcItem.bottom - rcItem.top - CLOSE_BTN_SIZE) / 2;
+    rcClose.bottom = rcClose.top + CLOSE_BTN_SIZE;
+    
+    /* Inflate slightly for easier clicking (2px padding) */
+    InflateRect(&rcClose, 2, 2);
+    
+    return PtInRect(&rcClose, pt);
+}
+
 /* Subclassed tab control procedure to catch mouse events */
 static LRESULT CALLBACK TabSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_MOUSEMOVE: {
             /* Track mouse for close button hover effect */
-            POINT pt = {LOWORD(lParam), HIWORD(lParam)};
+            POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
             
             /* Enable mouse leave tracking */
             if (!g_bTrackingMouse) {
@@ -224,15 +247,9 @@ static LRESULT CALLBACK TabSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             htInfo.pt = pt;
             int nTab = TabCtrl_HitTest(hwnd, &htInfo);
             
-            if (nTab >= 0) {
-                RECT rcItem;
-                TabCtrl_GetItemRect(hwnd, nTab, &rcItem);
-                int closeX = rcItem.right - CLOSE_BTN_SIZE - 4;
-                
-                if (pt.x >= closeX && pt.x <= rcItem.right) {
-                    g_nHoverTab = nTab;
-                    g_bHoverClose = TRUE;
-                }
+            if (IsPointInCloseButton(hwnd, nTab, pt)) {
+                g_nHoverTab = nTab;
+                g_bHoverClose = TRUE;
             }
             
             /* Redraw tab if hover state changed */
@@ -252,25 +269,55 @@ static LRESULT CALLBACK TabSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             break;
         }
         
+        case WM_LBUTTONDOWN: {
+            /* Check if click is on close button - handle on LBUTTONDOWN for immediate response */
+            POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            
+            TCHITTESTINFO htInfo;
+            htInfo.pt = pt;
+            int nTab = TabCtrl_HitTest(hwnd, &htInfo);
+            
+            if (IsPointInCloseButton(hwnd, nTab, pt)) {
+                /* Close the tab */
+                HWND hwndParent = GetParent(hwnd);
+                CloseTab(hwndParent, nTab);
+                return 0;  /* Prevent default tab selection behavior */
+            }
+            /* Fall through to default handler for normal tab selection */
+            break;
+        }
+        
         case WM_LBUTTONUP: {
-            /* Check if click is on close button */
-            POINT pt = {LOWORD(lParam), HIWORD(lParam)};
+            /* Also check on LBUTTONUP as backup */
+            POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            
+            TCHITTESTINFO htInfo;
+            htInfo.pt = pt;
+            int nTab = TabCtrl_HitTest(hwnd, &htInfo);
+            
+            if (IsPointInCloseButton(hwnd, nTab, pt)) {
+                /* Close the tab */
+                HWND hwndParent = GetParent(hwnd);
+                CloseTab(hwndParent, nTab);
+                return 0;
+            }
+            break;
+        }
+        
+        case WM_MBUTTONDOWN:
+        case WM_MBUTTONUP: {
+            /* Middle mouse button click closes tab (like browser behavior) */
+            POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
             
             TCHITTESTINFO htInfo;
             htInfo.pt = pt;
             int nTab = TabCtrl_HitTest(hwnd, &htInfo);
             
             if (nTab >= 0) {
-                RECT rcItem;
-                TabCtrl_GetItemRect(hwnd, nTab, &rcItem);
-                int closeX = rcItem.right - CLOSE_BTN_SIZE - 4;
-                
-                if (pt.x >= closeX) {
-                    /* Get parent window and close tab */
-                    HWND hwndParent = GetParent(hwnd);
-                    CloseTab(hwndParent, nTab);
-                    return 0;
-                }
+                /* Close the tab that was middle-clicked */
+                HWND hwndParent = GetParent(hwnd);
+                CloseTab(hwndParent, nTab);
+                return 0;
             }
             break;
         }
@@ -497,7 +544,7 @@ void CloseTab(HWND hwnd, int nTabIndex) {
     /* Sync session after tab close */
     MarkSessionDirty();
     
-    /* If no tabs left, create a new one */
+    /* If no tabs left, create a new untitled tab (Requirement 2.3, 4.2) */
     if (g_AppState.nTabCount == 0) {
         AddNewTab(hwnd, TEXT("Untitled"));
     } else {
@@ -1080,37 +1127,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
         }
         
-        case WM_LBUTTONUP: {
-            /* Check if click is on tab close button (backup handler) */
-            POINT pt = {LOWORD(lParam), HIWORD(lParam)};
-            HWND hwndTab = g_AppState.hwndTab;
-            
-            /* Convert to tab control coordinates */
-            RECT rcTab;
-            GetWindowRect(hwndTab, &rcTab);
-            MapWindowPoints(HWND_DESKTOP, hwnd, (LPPOINT)&rcTab, 2);
-            
-            if (PtInRect(&rcTab, pt)) {
-                /* Find which tab was clicked */
-                TCHITTESTINFO htInfo;
-                htInfo.pt.x = pt.x - rcTab.left;
-                htInfo.pt.y = pt.y - rcTab.top;
-                int nTab = TabCtrl_HitTest(hwndTab, &htInfo);
-                
-                if (nTab >= 0) {
-                    /* Check if click is on close button area */
-                    RECT rcItem;
-                    TabCtrl_GetItemRect(hwndTab, nTab, &rcItem);
-                    
-                    int closeX = rcItem.right - CLOSE_BTN_SIZE - 4;
-                    if (htInfo.pt.x >= closeX) {
-                        CloseTab(hwnd, nTab);
-                        return 0;
-                    }
-                }
-            }
-            break;
-        }
+        /* Note: WM_LBUTTONUP for tab close is handled by TabSubclassProc using IsPointInCloseButton */
 
         case WM_COMMAND: {
             HWND hwndEdit = GetCurrentEdit();

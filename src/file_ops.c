@@ -1505,6 +1505,8 @@ BOOL PromptSaveChanges(HWND hwnd) {
         case IDYES:
             return FileSave(hwnd);
         case IDNO:
+            /* User chose not to save - mark as not modified so close can proceed */
+            pTab->bModified = FALSE;
             return TRUE;
         case IDCANCEL:
         default:
