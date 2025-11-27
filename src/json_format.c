@@ -488,10 +488,7 @@ static JsonValue* ParseObject(JsonParser* parser) {
             WCHAR** newKeys = (WCHAR**)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
                                                     obj->data.object.keys,
                                                     newCapacity * sizeof(WCHAR*));
-            JsonValue** newValues = (JsonValue**)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
-                                                              obj->data.object.values,
-                                                              newCapacity * sizeof(JsonValue*));
-            if (!newKeys || !newValues) {
+            if (!newKeys) {
                 HeapFree(GetProcessHeap(), 0, key);
                 JsonFreeValue(value);
                 JsonFreeValue(obj);
@@ -499,6 +496,17 @@ static JsonValue* ParseObject(JsonParser* parser) {
                 return NULL;
             }
             obj->data.object.keys = newKeys;
+            
+            JsonValue** newValues = (JsonValue**)HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
+                                                              obj->data.object.values,
+                                                              newCapacity * sizeof(JsonValue*));
+            if (!newValues) {
+                HeapFree(GetProcessHeap(), 0, key);
+                JsonFreeValue(value);
+                JsonFreeValue(obj);
+                SetError(parser, L"Out of memory");
+                return NULL;
+            }
             obj->data.object.values = newValues;
             obj->data.object.capacity = newCapacity;
         }
@@ -552,27 +560,39 @@ static JsonValue* ParseValue(JsonParser* parser) {
         return ParseNumber(parser);
     }
     
-    /* Check for keywords */
+    /* Check for keywords - must be followed by delimiter or end of input */
     if (wcsncmp(parser->input + parser->pos, L"true", 4) == 0) {
-        parser->pos += 4;
-        parser->column += 4;
-        JsonValue* value = CreateValue(JSON_BOOL);
-        if (value) value->data.boolValue = TRUE;
-        return value;
+        WCHAR nextCh = parser->input[parser->pos + 4];
+        if (nextCh == L'\0' || nextCh == L',' || nextCh == L']' || nextCh == L'}' ||
+            nextCh == L' ' || nextCh == L'\t' || nextCh == L'\n' || nextCh == L'\r') {
+            parser->pos += 4;
+            parser->column += 4;
+            JsonValue* value = CreateValue(JSON_BOOL);
+            if (value) value->data.boolValue = TRUE;
+            return value;
+        }
     }
     
     if (wcsncmp(parser->input + parser->pos, L"false", 5) == 0) {
-        parser->pos += 5;
-        parser->column += 5;
-        JsonValue* value = CreateValue(JSON_BOOL);
-        if (value) value->data.boolValue = FALSE;
-        return value;
+        WCHAR nextCh = parser->input[parser->pos + 5];
+        if (nextCh == L'\0' || nextCh == L',' || nextCh == L']' || nextCh == L'}' ||
+            nextCh == L' ' || nextCh == L'\t' || nextCh == L'\n' || nextCh == L'\r') {
+            parser->pos += 5;
+            parser->column += 5;
+            JsonValue* value = CreateValue(JSON_BOOL);
+            if (value) value->data.boolValue = FALSE;
+            return value;
+        }
     }
     
     if (wcsncmp(parser->input + parser->pos, L"null", 4) == 0) {
-        parser->pos += 4;
-        parser->column += 4;
-        return CreateValue(JSON_NULL);
+        WCHAR nextCh = parser->input[parser->pos + 4];
+        if (nextCh == L'\0' || nextCh == L',' || nextCh == L']' || nextCh == L'}' ||
+            nextCh == L' ' || nextCh == L'\t' || nextCh == L'\n' || nextCh == L'\r') {
+            parser->pos += 4;
+            parser->column += 4;
+            return CreateValue(JSON_NULL);
+        }
     }
     
     SetError(parser, L"Unexpected character");
@@ -586,6 +606,15 @@ JsonParseResult* JsonParse(const WCHAR* input) {
     JsonParseResult* result = (JsonParseResult*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 
                                                           sizeof(JsonParseResult));
     if (!result) return NULL;
+    
+    /* Handle null or empty input */
+    if (!input || *input == L'\0') {
+        result->success = FALSE;
+        result->errorLine = 1;
+        result->errorColumn = 1;
+        wcscpy(result->errorMessage, L"Empty input");
+        return result;
+    }
     
     JsonParser parser;
     InitParser(&parser, input);
@@ -620,6 +649,11 @@ JsonParseResult* JsonParse(const WCHAR* input) {
 
 static void AppendEscapedString(StringBuilder* sb, const WCHAR* str) {
     StringBuilder_AppendChar(sb, L'"');
+    
+    if (!str) {
+        StringBuilder_AppendChar(sb, L'"');
+        return;
+    }
     
     while (*str) {
         WCHAR ch = *str++;
@@ -855,6 +889,14 @@ void FormatJsonInEditor(HWND hwndEdit) {
         return;
     }
     
+    /* Warn for very large files */
+    if (len > 5 * 1024 * 1024) { /* 5MB */
+        int result = MessageBoxW(GetParent(hwndEdit), 
+            L"This is a large JSON file. Formatting may take a while.\n\nContinue?",
+            L"Format JSON", MB_YESNO | MB_ICONWARNING);
+        if (result != IDYES) return;
+    }
+    
     /* Allocate buffer and get text */
     WCHAR* text = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, (len + 1) * sizeof(WCHAR));
     if (!text) {
@@ -876,9 +918,16 @@ void FormatJsonInEditor(HWND hwndEdit) {
         return;
     }
     
+    /* Disable redraw during update for better performance */
+    SendMessage(hwndEdit, WM_SETREDRAW, FALSE, 0);
+    
     /* Update editor content */
     SetWindowTextW(hwndEdit, formatted);
     HeapFree(GetProcessHeap(), 0, formatted);
+    
+    /* Re-enable redraw */
+    SendMessage(hwndEdit, WM_SETREDRAW, TRUE, 0);
+    InvalidateRect(hwndEdit, NULL, TRUE);
     
     /* Mark document as modified */
     TabState* pTab = GetCurrentTabState();
@@ -897,6 +946,14 @@ void MinifyJsonInEditor(HWND hwndEdit) {
     if (len == 0) {
         MessageBoxW(GetParent(hwndEdit), L"Document is empty", L"Minify JSON", MB_OK | MB_ICONINFORMATION);
         return;
+    }
+    
+    /* Warn for very large files */
+    if (len > 5 * 1024 * 1024) { /* 5MB */
+        int result = MessageBoxW(GetParent(hwndEdit), 
+            L"This is a large JSON file. Minifying may take a while.\n\nContinue?",
+            L"Minify JSON", MB_YESNO | MB_ICONWARNING);
+        if (result != IDYES) return;
     }
     
     /* Allocate buffer and get text */
@@ -920,9 +977,16 @@ void MinifyJsonInEditor(HWND hwndEdit) {
         return;
     }
     
+    /* Disable redraw during update for better performance */
+    SendMessage(hwndEdit, WM_SETREDRAW, FALSE, 0);
+    
     /* Update editor content */
     SetWindowTextW(hwndEdit, minified);
     HeapFree(GetProcessHeap(), 0, minified);
+    
+    /* Re-enable redraw */
+    SendMessage(hwndEdit, WM_SETREDRAW, TRUE, 0);
+    InvalidateRect(hwndEdit, NULL, TRUE);
     
     /* Mark document as modified */
     TabState* pTab = GetCurrentTabState();
