@@ -1,0 +1,52 @@
+name: CI Build
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    paths-ignore:
+      - '**.md'
+      - '.kiro/**'
+  pull_request:
+    branches: [ main, master ]
+    paths-ignore:
+      - '**.md'
+      - '.kiro/**'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup MinGW
+      uses: egor-tensin/setup-mingw@v2
+      with:
+        platform: x64
+        
+    - name: Build xNote
+      run: |
+        mingw32-make clean
+        mingw32-make
+      shell: cmd
+      
+    - name: Verify build
+      run: |
+        if (Test-Path "xnote.exe") {
+          Write-Host "✓ Build successful!"
+          $file = Get-Item "xnote.exe"
+          Write-Host "  Size: $([math]::Round($file.Length / 1KB, 2)) KB"
+          Write-Host "  Modified: $($file.LastWriteTime)"
+        } else {
+          Write-Error "✗ Build failed: xnote.exe not found"
+          exit 1
+        }
+      shell: pwsh
+      
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: xnote-build-${{ github.sha }}
+        path: xnote.exe
+        retention-days: 7
