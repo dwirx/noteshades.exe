@@ -8,7 +8,7 @@
 #include <stdio.h>     /* For debug logging */
 
 /* Debug logging - writes to xnote_debug.log in current directory */
-#define DEBUG_LOG_ENABLED 1
+#define DEBUG_LOG_ENABLED 0
 
 static void DebugLog(const char* format, ...) {
 #if DEBUG_LOG_ENABLED
