@@ -45,17 +45,21 @@ echo [10/12] Compiling theme.c...
 gcc -Wall -Wextra -O3 -DUNICODE -D_UNICODE -c src/theme.c -o src/theme.o
 if errorlevel 1 goto error
 
-echo [11/12] Compiling settings.c...
+echo [11/13] Compiling settings.c...
 gcc -Wall -Wextra -O3 -DUNICODE -D_UNICODE -c src/settings.c -o src/settings.o
 if errorlevel 1 goto error
 
-echo [12/12] Compiling resources...
+echo [12/13] Compiling json_format.c...
+gcc -Wall -Wextra -O3 -DUNICODE -D_UNICODE -c src/json_format.c -o src/json_format.o
+if errorlevel 1 goto error
+
+echo [13/13] Compiling resources...
 windres "--preprocessor=gcc -E -xc -DRC_INVOKED" src/notepad.rc -o src/notepad.o
 if errorlevel 1 goto error
 
 echo.
 echo Linking...
-gcc src/main.o src/file_ops.o src/edit_ops.o src/dialogs.o src/line_numbers.o src/statusbar.o src/syntax.o src/vim_mode.o src/session.o src/theme.o src/settings.o src/notepad.o -o xnote.exe -mwindows -lcomctl32 -lcomdlg32 -lshell32 -s
+gcc src/main.o src/file_ops.o src/edit_ops.o src/dialogs.o src/line_numbers.o src/statusbar.o src/syntax.o src/vim_mode.o src/session.o src/theme.o src/settings.o src/json_format.o src/notepad.o -o xnote.exe -mwindows -lcomctl32 -lcomdlg32 -lshell32 -s
 if errorlevel 1 goto error
 
 echo.

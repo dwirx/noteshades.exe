@@ -1,6 +1,7 @@
 #include "notepad.h"
 #include "syntax.h"
 #include "session.h"
+#include "json_format.h"
 #include <stdio.h>
 #include <richedit.h>
 
@@ -1430,6 +1431,14 @@ BOOL FileOpen(HWND hwnd) {
     return TRUE;
 }
 
+/* Check if file is a JSON file */
+static BOOL IsJsonFile(const TCHAR* szFileName) {
+    if (!szFileName) return FALSE;
+    const TCHAR* pExt = _tcsrchr(szFileName, TEXT('.'));
+    if (!pExt) return FALSE;
+    return (_tcsicmp(pExt, TEXT(".json")) == 0);
+}
+
 /* Save current file */
 BOOL FileSave(HWND hwnd) {
     TabState* pTab = GetCurrentTabState();
@@ -1437,6 +1446,11 @@ BOOL FileSave(HWND hwnd) {
     
     if (pTab->bUntitled) {
         return FileSaveAs(hwnd);
+    }
+    
+    /* Auto-format JSON if enabled and file is .json */
+    if (IsAutoFormatJsonEnabled() && IsJsonFile(pTab->szFileName)) {
+        FormatJsonInEditor(pTab->hwndEdit);
     }
     
     if (!WriteFileContent(pTab->hwndEdit, pTab->szFileName)) {

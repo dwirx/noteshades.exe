@@ -27,10 +27,11 @@ SRCS = $(SRC_DIR)/main.c \
        $(SRC_DIR)/syntax.c \
        $(SRC_DIR)/vim_mode.c \
        $(SRC_DIR)/session.c \
-       $(SRC_DIR)/theme.c
+       $(SRC_DIR)/theme.c \
+       $(SRC_DIR)/json_format.c
 
 # Object files
-OBJS = $(SRC_DIR)/main.o $(SRC_DIR)/file_ops.o $(SRC_DIR)/edit_ops.o $(SRC_DIR)/dialogs.o $(SRC_DIR)/line_numbers.o $(SRC_DIR)/statusbar.o $(SRC_DIR)/syntax.o $(SRC_DIR)/vim_mode.o $(SRC_DIR)/session.o $(SRC_DIR)/theme.o
+OBJS = $(SRC_DIR)/main.o $(SRC_DIR)/file_ops.o $(SRC_DIR)/edit_ops.o $(SRC_DIR)/dialogs.o $(SRC_DIR)/line_numbers.o $(SRC_DIR)/statusbar.o $(SRC_DIR)/syntax.o $(SRC_DIR)/vim_mode.o $(SRC_DIR)/session.o $(SRC_DIR)/theme.o $(SRC_DIR)/json_format.o
 
 # Resource files
 RES_SRC = $(SRC_DIR)/notepad.rc
@@ -74,6 +75,9 @@ $(SRC_DIR)/session.o: $(SRC_DIR)/session.c $(SRC_DIR)/session.h $(SRC_DIR)/notep
 
 $(SRC_DIR)/theme.o: $(SRC_DIR)/theme.c $(SRC_DIR)/theme.h $(SRC_DIR)/notepad.h $(SRC_DIR)/resource.h
 	$(CC) $(CFLAGS) -c $(SRC_DIR)/theme.c -o $(SRC_DIR)/theme.o
+
+$(SRC_DIR)/json_format.o: $(SRC_DIR)/json_format.c $(SRC_DIR)/json_format.h $(SRC_DIR)/notepad.h $(SRC_DIR)/resource.h
+	$(CC) $(CFLAGS) -c $(SRC_DIR)/json_format.c -o $(SRC_DIR)/json_format.o
 
 # Compile resource file
 $(RES_OBJ): $(RES_SRC) $(SRC_DIR)/resource.h

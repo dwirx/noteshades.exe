@@ -1011,6 +1011,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                           g_AppState.bWordWrap ? MF_CHECKED : MF_UNCHECKED);
             CheckMenuItem(hMenu, IDM_VIEW_SYNTAX, 
                           g_bSyntaxHighlight ? MF_CHECKED : MF_UNCHECKED);
+            CheckMenuItem(hMenu, IDM_AUTO_FORMAT_JSON, 
+                          IsAutoFormatJsonEnabled() ? MF_CHECKED : MF_UNCHECKED);
             
             /* Start periodic sync timer for line numbers if enabled */
             if (g_AppState.bShowLineNumbers) {
@@ -1267,6 +1269,25 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 case IDM_FORMAT_FONT:
                     ShowFontDialog(hwnd);
                     break;
+                
+                /* JSON formatter */
+                case IDM_FORMAT_JSON:
+                    if (hwndEdit) FormatJsonInEditor(hwndEdit);
+                    break;
+                
+                case IDM_MINIFY_JSON:
+                    if (hwndEdit) MinifyJsonInEditor(hwndEdit);
+                    break;
+                
+                case IDM_AUTO_FORMAT_JSON: {
+                    BOOL bEnabled = !IsAutoFormatJsonEnabled();
+                    SetAutoFormatJson(bEnabled);
+                    HMENU hMenu = GetMenu(hwnd);
+                    CheckMenuItem(hMenu, IDM_AUTO_FORMAT_JSON, 
+                                  bEnabled ? MF_CHECKED : MF_UNCHECKED);
+                    MarkSessionDirty();
+                    break;
+                }
                 
                 /* View menu */
                 case IDM_VIEW_LINENUMBERS:

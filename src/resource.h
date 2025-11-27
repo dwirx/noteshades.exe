@@ -108,6 +108,11 @@
 #define IDM_VIEW_ZOOMRESET  267
 #define IDM_VIEW_FULLSCREEN 268
 
+/* JSON formatter command IDs */
+#define IDM_FORMAT_JSON         253
+#define IDM_MINIFY_JSON         254
+#define IDM_AUTO_FORMAT_JSON    255
+
 /* Theme menu command IDs */
 #define IDM_THEME_LIGHT         270
 #define IDM_THEME_DARK          271

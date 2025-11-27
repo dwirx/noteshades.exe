@@ -235,4 +235,11 @@ int CountWords(HWND hwndEdit);
 void SetGlobalFont(HFONT hFont);
 HFONT GetGlobalFont(void);
 
+/* JSON formatter operations */
+#include "json_format.h"
+
+/* Settings functions */
+BOOL IsAutoFormatJsonEnabled(void);
+void SetAutoFormatJson(BOOL bEnabled);
+
 #endif /* NOTEPAD_H */

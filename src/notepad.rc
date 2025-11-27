@@ -45,6 +45,9 @@ IDI_APPICON ICON "icons/xnote.ico"
 #define IDM_HELP_CONTENTS   302
 #define IDM_FORMAT_WORDWRAP 251
 #define IDM_FORMAT_FONT     252
+#define IDM_FORMAT_JSON         253
+#define IDM_MINIFY_JSON         254
+#define IDM_AUTO_FORMAT_JSON    255
 #define IDM_VIEW_LINENUMBERS 261
 #define IDM_VIEW_SYNTAX      262
 #define IDM_VIEW_VIMMODE     263
@@ -116,6 +119,11 @@ BEGIN
     BEGIN
         MENUITEM "&Word Wrap\tAlt+Z",       IDM_FORMAT_WORDWRAP
         MENUITEM "&Font...",                IDM_FORMAT_FONT
+        MENUITEM SEPARATOR
+        MENUITEM "Format &JSON\tCtrl+Shift+J", IDM_FORMAT_JSON
+        MENUITEM "&Minify JSON",            IDM_MINIFY_JSON
+        MENUITEM SEPARATOR
+        MENUITEM "&Auto-Format JSON on Save", IDM_AUTO_FORMAT_JSON
     END
     POPUP "&View"
     BEGIN
@@ -210,6 +218,7 @@ BEGIN
     
     /* Format */
     "Z",    IDM_FORMAT_WORDWRAP, VIRTKEY, ALT
+    "J",    IDM_FORMAT_JSON,    VIRTKEY, CONTROL, SHIFT
     
     /* Help */
     VK_F1,  IDM_HELP_CONTENTS,  VIRTKEY
