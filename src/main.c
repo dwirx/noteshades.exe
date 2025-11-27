@@ -5,6 +5,27 @@
 #include "theme.h"
 #include <richedit.h>
 #include <windowsx.h>  /* For GET_X_LPARAM, GET_Y_LPARAM macros */
+#include <stdio.h>     /* For debug logging */
+
+/* Debug logging - writes to xnote_debug.log in current directory */
+#define DEBUG_LOG_ENABLED 1
+
+static void DebugLog(const char* format, ...) {
+#if DEBUG_LOG_ENABLED
+    FILE* fp = fopen("xnote_debug.log", "a");
+    if (fp) {
+        va_list args;
+        va_start(args, format);
+        vfprintf(fp, format, args);
+        va_end(args);
+        fprintf(fp, "\n");
+        fflush(fp);
+        fclose(fp);
+    }
+#else
+    (void)format;
+#endif
+}
 
 /* Global application state */
 AppState g_AppState = {0};
@@ -195,16 +216,24 @@ static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
 static int g_nHoverTab = -1;
 static BOOL g_bHoverClose = FALSE;
 static BOOL g_bTrackingMouse = FALSE;
-
 /* Original tab control window procedure */
 static WNDPROC g_OrigTabProc = NULL;
 
 /* Helper function to check if point is in close button area */
 static BOOL IsPointInCloseButton(HWND hwndTab, int nTab, POINT pt) {
-    if (nTab < 0) return FALSE;
+    if (nTab < 0) {
+        DebugLog("[IsPointInCloseButton] nTab < 0, returning FALSE");
+        return FALSE;
+    }
     
     RECT rcItem;
-    if (!TabCtrl_GetItemRect(hwndTab, nTab, &rcItem)) return FALSE;
+    if (!TabCtrl_GetItemRect(hwndTab, nTab, &rcItem)) {
+        DebugLog("[IsPointInCloseButton] TabCtrl_GetItemRect failed for tab %d", nTab);
+        return FALSE;
+    }
+    
+    DebugLog("[IsPointInCloseButton] Tab %d rcItem: left=%d top=%d right=%d bottom=%d",
+             nTab, rcItem.left, rcItem.top, rcItem.right, rcItem.bottom);
     
     /* Close button rectangle - must match the drawing code in WM_DRAWITEM
      * Close button is drawn at: right - 4 - CLOSE_BTN_SIZE to right - 4
@@ -217,6 +246,10 @@ static BOOL IsPointInCloseButton(HWND hwndTab, int nTab, POINT pt) {
     
     /* Inflate slightly for easier clicking (2px padding) */
     InflateRect(&rcClose, 2, 2);
+    
+    BOOL bInRect = PtInRect(&rcClose, pt);
+    DebugLog("[IsPointInCloseButton] Tab %d: pt(%d,%d) closeRect(%d,%d,%d,%d) inRect=%d",
+             nTab, pt.x, pt.y, rcClose.left, rcClose.top, rcClose.right, rcClose.bottom, bInRect);
     
     return PtInRect(&rcClose, pt);
 }
@@ -277,18 +310,25 @@ static LRESULT CALLBACK TabSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             htInfo.pt = pt;
             int nTab = TabCtrl_HitTest(hwnd, &htInfo);
             
+            DebugLog("[WM_LBUTTONDOWN] Click at (%d,%d), HitTest tab=%d, tabCount=%d", 
+                     pt.x, pt.y, nTab, g_AppState.nTabCount);
+            
             if (IsPointInCloseButton(hwnd, nTab, pt)) {
+                DebugLog("[WM_LBUTTONDOWN] Close button clicked for tab %d, calling CloseTab", nTab);
                 /* Close the tab */
                 HWND hwndParent = GetParent(hwnd);
                 CloseTab(hwndParent, nTab);
+                DebugLog("[WM_LBUTTONDOWN] CloseTab returned, tabCount now=%d", g_AppState.nTabCount);
                 return 0;  /* Prevent default tab selection behavior */
             }
+            DebugLog("[WM_LBUTTONDOWN] Not on close button, passing to default handler");
             /* Fall through to default handler for normal tab selection */
             break;
         }
         
         case WM_LBUTTONUP: {
-            /* Also check on LBUTTONUP as backup */
+            /* Consume LBUTTONUP if it's on close button to prevent further processing */
+            /* Note: The actual close is handled in WM_LBUTTONDOWN for immediate response */
             POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
             
             TCHITTESTINFO htInfo;
@@ -296,9 +336,7 @@ static LRESULT CALLBACK TabSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             int nTab = TabCtrl_HitTest(hwnd, &htInfo);
             
             if (IsPointInCloseButton(hwnd, nTab, pt)) {
-                /* Close the tab */
-                HWND hwndParent = GetParent(hwnd);
-                CloseTab(hwndParent, nTab);
+                /* Just consume the event - don't close again (already closed on LBUTTONDOWN) */
                 return 0;
             }
             break;
@@ -493,32 +531,46 @@ int AddNewTab(HWND hwnd, const TCHAR* szTitle) {
 
 /* Close a tab */
 void CloseTab(HWND hwnd, int nTabIndex) {
-    if (nTabIndex < 0 || nTabIndex >= g_AppState.nTabCount) return;
+    DebugLog("[CloseTab] START - nTabIndex=%d, nTabCount=%d, nCurrentTab=%d", 
+             nTabIndex, g_AppState.nTabCount, g_AppState.nCurrentTab);
+    
+    if (nTabIndex < 0 || nTabIndex >= g_AppState.nTabCount) {
+        DebugLog("[CloseTab] Invalid tab index, returning early");
+        return;
+    }
     
     TabState* pTab = &g_AppState.tabs[nTabIndex];
     
     /* Check for unsaved changes */
     if (pTab->bModified) {
+        DebugLog("[CloseTab] Tab has unsaved changes, prompting user");
         g_AppState.nCurrentTab = nTabIndex;
         SwitchToTab(hwnd, nTabIndex);
         if (!PromptSaveChanges(hwnd)) {
+            DebugLog("[CloseTab] User cancelled save prompt, returning");
             return; /* User cancelled */
         }
+        DebugLog("[CloseTab] User responded to save prompt, continuing");
     }
     
+    DebugLog("[CloseTab] Destroying edit control hwnd=%p", (void*)pTab->hwndEdit);
     /* Destroy edit control */
     if (pTab->hwndEdit) {
         DestroyWindow(pTab->hwndEdit);
+        pTab->hwndEdit = NULL;
     }
     
+    DebugLog("[CloseTab] Destroying line number window");
     /* Destroy line number window */
     if (pTab->lineNumState.hwndLineNumbers) {
         DestroyWindow(pTab->lineNumState.hwndLineNumbers);
+        pTab->lineNumState.hwndLineNumbers = NULL;
     }
     
     /* Free content buffer if allocated */
     if (pTab->pContent) {
         HeapFree(GetProcessHeap(), 0, pTab->pContent);
+        pTab->pContent = NULL;
     }
     
     /* Clean up memory-mapped file handles (Requirement 1.3) */
@@ -531,28 +583,44 @@ void CloseTab(HWND hwnd, int nTabIndex) {
         pTab->hFileMapping = NULL;
     }
     
+    DebugLog("[CloseTab] Removing tab from tab control");
     /* Remove tab from tab control */
     TabCtrl_DeleteItem(g_AppState.hwndTab, nTabIndex);
     
+    /* Force tab control to repaint immediately */
+    InvalidateRect(g_AppState.hwndTab, NULL, TRUE);
+    UpdateWindow(g_AppState.hwndTab);
+    
+    DebugLog("[CloseTab] Shifting remaining tabs");
     /* Shift remaining tabs */
     for (int i = nTabIndex; i < g_AppState.nTabCount - 1; i++) {
         g_AppState.tabs[i] = g_AppState.tabs[i + 1];
     }
     
     g_AppState.nTabCount--;
+    DebugLog("[CloseTab] Tab count decremented to %d", g_AppState.nTabCount);
     
     /* Sync session after tab close */
     MarkSessionDirty();
     
     /* If no tabs left, create a new untitled tab (Requirement 2.3, 4.2) */
     if (g_AppState.nTabCount == 0) {
+        DebugLog("[CloseTab] No tabs left, creating new Untitled tab");
         AddNewTab(hwnd, TEXT("Untitled"));
+        DebugLog("[CloseTab] New tab created, tabCount=%d", g_AppState.nTabCount);
     } else {
         /* Switch to appropriate tab */
         int nNewCurrent = (nTabIndex >= g_AppState.nTabCount) ?
                           g_AppState.nTabCount - 1 : nTabIndex;
+        DebugLog("[CloseTab] Switching to tab %d", nNewCurrent);
         SwitchToTab(hwnd, nNewCurrent);
     }
+    /* Force final repaint of tab control to ensure UI is updated */
+    InvalidateRect(g_AppState.hwndTab, NULL, TRUE);
+    UpdateWindow(g_AppState.hwndTab);
+    
+    DebugLog("[CloseTab] END - nTabCount=%d, nCurrentTab=%d", 
+             g_AppState.nTabCount, g_AppState.nCurrentTab);
 }
 
 /* Close all tabs */
