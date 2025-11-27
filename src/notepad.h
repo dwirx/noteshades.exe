@@ -81,6 +81,9 @@ typedef enum {
 /* Undo buffer limits */
 #define UNDO_LIMIT_LARGE_FILE   100                     /* Max undo operations for large files */
 
+/* Forward declare MultiCursorState */
+#include "multi_cursor.h"
+
 /* Tab/Document state structure */
 typedef struct {
     TCHAR szFileName[MAX_PATH];  /* Full path of current file */
@@ -102,6 +105,9 @@ typedef struct {
     DWORD dwTotalFileSize;       /* Total file size on disk */
     DWORD dwLoadedSize;          /* Amount currently loaded in editor */
     DWORD dwChunkSize;           /* Chunk size for partial loading */
+
+    /* Multi-cursor support */
+    MultiCursorState multiCursor; /* Multi-cursor state for this tab */
 } TabState;
 
 /* Application state structure */
@@ -241,5 +247,14 @@ HFONT GetGlobalFont(void);
 /* Settings functions */
 BOOL IsAutoFormatJsonEnabled(void);
 void SetAutoFormatJson(BOOL bEnabled);
+
+/* Drag and Drop operations */
+void DragDrop_Enable(HWND hwnd);
+void DragDrop_HandleFiles(HWND hwnd, HDROP hDrop);
+int DragDrop_FindOpenFile(const TCHAR* szFileName);
+BOOL DragDrop_IsValidFile(const TCHAR* szFileName);
+
+/* Multi-cursor helper */
+MultiCursorState* GetCurrentMultiCursorState(void);
 
 #endif /* NOTEPAD_H */

@@ -1,0 +1,17 @@
+Hello World
+This is a test file for multi-cursor
+Hello again here
+Another Hello line
+Hello there friend
+Test Hello test
+
+Try these steps:
+1. Select "Hello" on line 1
+2. Press Ctrl+D multiple times to select all "Hello"
+3. Type something - all "Hello" should change
+4. Press Escape to exit multi-cursor mode
+
+Or try:
+- Alt+Click at different positions to add cursors
+- Type something - text appears at all cursor positions
+- Press Escape or click normally to exit

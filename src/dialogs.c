@@ -1,4 +1,5 @@
 #include "notepad.h"
+#include "multi_cursor.h"
 #include <richedit.h>
 
 static TCHAR g_szFindText[256] = TEXT("");
@@ -204,6 +205,12 @@ INT_PTR CALLBACK FindReplaceDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM l
     (void)lParam;
     switch (msg) {
         case WM_INITDIALOG: {
+            /* Clear multi-cursor mode when find/replace dialog opens */
+            MultiCursorState* pMC = GetCurrentMultiCursorState();
+            if (pMC && MultiCursor_IsActive(pMC)) {
+                MultiCursor_Clear(pMC);
+            }
+            
             SetDlgItemText(hDlg, IDC_FIND_TEXT, g_szFindText);
             SetDlgItemText(hDlg, IDC_REPLACE_TEXT, g_szReplaceText);
             CheckDlgButton(hDlg, IDC_MATCH_CASE, g_bMatchCase ? BST_CHECKED : BST_UNCHECKED);

@@ -3,9 +3,11 @@
 #include "vim_mode.h"
 #include "session.h"
 #include "theme.h"
+#include "multi_cursor.h"
 #include <richedit.h>
 #include <windowsx.h>  /* For GET_X_LPARAM, GET_Y_LPARAM macros */
 #include <stdio.h>     /* For debug logging */
+#include <shellapi.h>  /* For drag and drop */
 
 /* Debug logging - writes to xnote_debug.log in current directory */
 #define DEBUG_LOG_ENABLED 0
@@ -83,7 +85,45 @@ static LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
         }
     }
     
+    /* Process multi-cursor input */
+    MultiCursorState* pMC = GetCurrentMultiCursorState();
+    if (pMC) {
+        /* Handle multi-cursor keyboard input */
+        if (msg == WM_KEYDOWN || msg == WM_CHAR) {
+            if (MultiCursor_ProcessKey(hwnd, pMC, msg, wParam, lParam)) {
+                /* Update status bar to show cursor count */
+                UpdateStatusBar(g_AppState.hwndMain);
+                return 0; /* Key was handled by multi-cursor */
+            }
+        }
+        
+        /* Handle multi-cursor mouse input (Alt+Click) */
+        if (msg == WM_LBUTTONDOWN) {
+            if (MultiCursor_ProcessMouse(hwnd, pMC, msg, wParam, lParam)) {
+                /* Update status bar to show cursor count */
+                UpdateStatusBar(g_AppState.hwndMain);
+                return 0; /* Mouse was handled by multi-cursor */
+            }
+        }
+    }
+    
     switch (msg) {
+        case WM_PAINT: {
+            /* Let RichEdit paint first */
+            LRESULT result = CallWindowProc(g_OrigEditProc, hwnd, msg, wParam, lParam);
+            
+            /* Draw multi-cursor overlay */
+            MultiCursorState* pMCPaint = GetCurrentMultiCursorState();
+            if (pMCPaint && MultiCursor_IsActive(pMCPaint)) {
+                HDC hdc = GetDC(hwnd);
+                if (hdc) {
+                    MultiCursor_DrawOverlay(hwnd, hdc, pMCPaint);
+                    ReleaseDC(hwnd, hdc);
+                }
+            }
+            return result;
+        }
+        
         case WM_TIMER:
             if (wParam == TIMER_SCROLL_DEBOUNCE) {
                 /* Debounced scroll update */
@@ -402,6 +442,18 @@ void InitTabState(TabState* pState) {
     pState->dwTotalFileSize = 0;             /* No file loaded */
     pState->dwLoadedSize = 0;                /* Nothing loaded yet */
     pState->dwChunkSize = 20 * 1024 * 1024;  /* Default 20MB chunks */
+
+    /* Initialize multi-cursor state */
+    MultiCursor_Init(&pState->multiCursor);
+}
+
+/* Get current multi-cursor state */
+MultiCursorState* GetCurrentMultiCursorState(void) {
+    TabState* pTab = GetCurrentTabState();
+    if (pTab) {
+        return &pTab->multiCursor;
+    }
+    return NULL;
 }
 
 /* Create edit control for a tab */
@@ -1025,6 +1077,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             /* Initialize session system (auto-save timer) */
             InitSessionSystem(hwnd);
             
+            /* Enable drag and drop */
+            DragDrop_Enable(hwnd);
+            
             /* Initial status bar update */
             UpdateStatusBar(hwnd);
             
@@ -1490,6 +1545,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     }
                     break;
             }
+            return 0;
+        }
+
+        case WM_DROPFILES: {
+            /* Handle drag and drop files */
+            DragDrop_HandleFiles(hwnd, (HDROP)wParam);
             return 0;
         }
 

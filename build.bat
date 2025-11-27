@@ -49,17 +49,25 @@ echo [11/13] Compiling settings.c...
 gcc -Wall -Wextra -O3 -DUNICODE -D_UNICODE -c src/settings.c -o src/settings.o
 if errorlevel 1 goto error
 
-echo [12/13] Compiling json_format.c...
+echo [12/15] Compiling json_format.c...
 gcc -Wall -Wextra -O3 -DUNICODE -D_UNICODE -c src/json_format.c -o src/json_format.o
 if errorlevel 1 goto error
 
-echo [13/13] Compiling resources...
+echo [13/15] Compiling multi_cursor.c...
+gcc -Wall -Wextra -O3 -DUNICODE -D_UNICODE -c src/multi_cursor.c -o src/multi_cursor.o
+if errorlevel 1 goto error
+
+echo [14/15] Compiling dragdrop.c...
+gcc -Wall -Wextra -O3 -DUNICODE -D_UNICODE -c src/dragdrop.c -o src/dragdrop.o
+if errorlevel 1 goto error
+
+echo [15/15] Compiling resources...
 windres "--preprocessor=gcc -E -xc -DRC_INVOKED" src/notepad.rc -o src/notepad.o
 if errorlevel 1 goto error
 
 echo.
 echo Linking...
-gcc src/main.o src/file_ops.o src/edit_ops.o src/dialogs.o src/line_numbers.o src/statusbar.o src/syntax.o src/vim_mode.o src/session.o src/theme.o src/settings.o src/json_format.o src/notepad.o -o xnote.exe -mwindows -lcomctl32 -lcomdlg32 -lshell32 -s
+gcc src/main.o src/file_ops.o src/edit_ops.o src/dialogs.o src/line_numbers.o src/statusbar.o src/syntax.o src/vim_mode.o src/session.o src/theme.o src/settings.o src/json_format.o src/multi_cursor.o src/dragdrop.o src/notepad.o -o xnote.exe -mwindows -lcomctl32 -lcomdlg32 -lshell32 -lshlwapi -s
 if errorlevel 1 goto error
 
 echo.
@@ -77,6 +85,8 @@ echo   - UTF-8 encoding with BOM detection
 echo   - Vim mode with modal editing
 echo   - Word wrap toggle
 echo   - Modern UI with theme support
+echo   - **Multi-cursor editing (Ctrl+D, Alt+Click)**
+echo   - **Drag and drop file opening**
 echo.
 echo Supported Languages:
 echo   C, C++, Java, JavaScript, TypeScript, Python,

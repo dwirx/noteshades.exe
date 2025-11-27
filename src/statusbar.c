@@ -1,6 +1,7 @@
 #include "notepad.h"
 #include "syntax.h"
 #include "vim_mode.h"
+#include "multi_cursor.h"
 
 /* Create status bar */
 HWND CreateStatusBar(HWND hwndParent, HINSTANCE hInstance) {
@@ -236,8 +237,18 @@ void UpdateStatusBar(HWND hwnd) {
         SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_INSERTMODE, (LPARAM)TEXT("INS"));
     }
     
-    /* Part 7: Vim mode */
-    if (IsVimModeEnabled()) {
+    /* Part 7: Vim mode or Multi-cursor info */
+    MultiCursorState* pMC = GetCurrentMultiCursorState();
+    if (pMC && MultiCursor_IsActive(pMC)) {
+        /* Show multi-cursor count */
+        int nCursors = MultiCursor_GetCount(pMC);
+        if (pMC->bColumnMode) {
+            _sntprintf(szText, 256, TEXT("COL %d cursors"), nCursors);
+        } else {
+            _sntprintf(szText, 256, TEXT("%d cursors"), nCursors);
+        }
+        SendMessage(g_AppState.hwndStatus, SB_SETTEXT, SB_PART_VIMMODE, (LPARAM)szText);
+    } else if (IsVimModeEnabled()) {
         VimModeState vimMode = GetVimModeState();
         if (vimMode == VIM_MODE_COMMAND || vimMode == VIM_MODE_SEARCH) {
             /* Show command buffer */

@@ -1,0 +1,219 @@
+# Implementation Plan
+
+- [x] 1. Set up multi-cursor core infrastructure
+  - [x] 1.1 Create multi_cursor.h header file with structures and function declarations
+    - Define CursorInfo, MultiCursorState structures
+    - Define MAX_CURSORS constant
+    - Declare all multi-cursor API functions
+    - _Requirements: 2.1, 2.2, 6.2_
+  - [x] 1.2 Create multi_cursor.c with initialization and basic cursor management
+    - Implement MultiCursor_Init()
+    - Implement MultiCursor_Add()
+    - Implement MultiCursor_Remove()
+    - Implement MultiCursor_Clear()
+    - Implement MultiCursor_GetCount()
+    - _Requirements: 2.1, 2.2, 2.4_
+  - [ ]* 1.3 Write property test for cursor addition
+    - **Property 2: Cursor Addition Increases Count**
+    - **Validates: Requirements 2.1**
+  - [ ]* 1.4 Write property test for cursor removal
+    - **Property 3: Cursor Removal at Existing Position**
+    - **Validates: Requirements 2.2**
+  - [ ]* 1.5 Write property test for cursor count accuracy
+    - **Property 9: Cursor Count Accuracy**
+    - **Validates: Requirements 4.3**
+
+- [x] 2. Integrate multi-cursor state into TabState
+  - [x] 2.1 Extend TabState structure in notepad.h
+    - Add MultiCursorState field
+    - Add hwndCursorOverlay field
+    - _Requirements: 6.2_
+  - [x] 2.2 Update InitTabState() to initialize multi-cursor state
+    - Call MultiCursor_Init() for new tabs
+    - _Requirements: 6.2_
+  - [x] 2.3 Update tab switching to preserve multi-cursor state
+    - Save state when switching away
+    - Restore state when switching back
+    - _Requirements: 6.2_
+  - [ ]* 2.4 Write property test for tab switch preservation
+    - **Property 13: Tab Switch Preserves Multi-Cursor State**
+    - **Validates: Requirements 6.2**
+
+- [x] 3. Implement Select Next Occurrence (Ctrl+D)
+  - [x] 3.1 Implement text search function for finding occurrences
+    - FindNextOccurrence() function
+    - Handle case sensitivity
+    - Handle wrap-around search
+    - _Requirements: 1.1, 1.3_
+  - [x] 3.2 Implement MultiCursor_SelectNextOccurrence()
+    - Get current selection text
+    - Find next occurrence
+    - Add new selection to cursor list
+    - _Requirements: 1.1, 1.2_
+  - [x] 3.3 Add Ctrl+D keyboard handler in EditSubclassProc
+    - Detect Ctrl+D keypress
+    - Call MultiCursor_SelectNextOccurrence()
+    - Update display
+    - _Requirements: 1.1_
+  - [ ]* 3.4 Write property test for select next occurrence
+    - **Property 1: Select Next Occurrence Finds Correct Match**
+    - **Validates: Requirements 1.1, 1.2**
+
+- [x] 4. Implement multi-cursor text operations
+  - [x] 4.1 Implement MultiCursor_InsertText()
+    - Insert text at all cursor positions
+    - Adjust cursor positions after insertion
+    - Handle position shifts correctly
+    - _Requirements: 1.5, 2.3_
+  - [x] 4.2 Implement MultiCursor_Delete()
+    - Delete at all cursor positions
+    - Handle backspace and delete key
+    - Adjust positions after deletion
+    - _Requirements: 1.5, 2.3_
+  - [x] 4.3 Hook text input to multi-cursor handler
+    - Intercept WM_CHAR in EditSubclassProc
+    - Route to MultiCursor_InsertText() when multi-cursor active
+    - _Requirements: 1.5, 2.3_
+  - [ ]* 4.4 Write property test for multi-cursor typing
+    - **Property 4: Multi-Cursor Typing Consistency**
+    - **Validates: Requirements 1.5, 2.3**
+
+- [x] 5. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 6. Implement Alt+Click cursor addition
+  - [x] 6.1 Add Alt+Click detection in EditSubclassProc
+    - Detect WM_LBUTTONDOWN with Alt key
+    - Calculate character position from mouse coordinates
+    - _Requirements: 2.1_
+  - [x] 6.2 Implement cursor toggle on Alt+Click
+    - Add cursor if position is new
+    - Remove cursor if position exists
+    - _Requirements: 2.1, 2.2_
+  - [x] 6.3 Implement Escape key to clear cursors
+    - Detect Escape in EditSubclassProc
+    - Call MultiCursor_Clear()
+    - _Requirements: 2.4_
+  - [ ]* 6.4 Write property test for escape collapse
+    - **Property 5: Escape Collapses to Single Cursor**
+    - **Validates: Requirements 2.4**
+
+- [x] 7. Implement cursor movement
+  - [x] 7.1 Implement MultiCursor_Move()
+    - Handle arrow key directions
+    - Move all cursors simultaneously
+    - Handle line boundaries
+    - _Requirements: 2.5_
+  - [x] 7.2 Hook arrow keys to multi-cursor movement
+    - Intercept arrow keys in EditSubclassProc
+    - Route to MultiCursor_Move() when multi-cursor active
+    - _Requirements: 2.5_
+  - [ ]* 7.3 Write property test for arrow key movement
+    - **Property 6: Arrow Key Preserves Relative Positions**
+    - **Validates: Requirements 2.5**
+
+- [x] 8. Implement column selection mode
+  - [x] 8.1 Implement column selection state management
+    - MultiCursor_StartColumnSelect()
+    - MultiCursor_ExtendColumnSelect()
+    - Track column boundaries
+    - _Requirements: 3.1, 3.2_
+  - [x] 8.2 Implement Alt+Shift+Arrow column selection
+    - Detect Alt+Shift+Arrow in EditSubclassProc
+    - Extend column selection
+    - _Requirements: 3.1_
+  - [x] 8.3 Implement Alt+Drag column selection
+    - Detect Alt+Drag in EditSubclassProc
+    - Create rectangular selection
+    - _Requirements: 3.2_
+  - [x] 8.4 Implement MultiCursor_ApplyColumnSelect()
+    - Convert column selection to multiple cursors
+    - Handle lines shorter than column
+    - _Requirements: 3.3, 3.4_
+  - [ ]* 8.5 Write property test for column selection geometry
+    - **Property 7: Column Selection Forms Rectangle**
+    - **Validates: Requirements 3.1, 3.2**
+  - [ ]* 8.6 Write property test for column typing
+    - **Property 8: Column Typing Inserts on All Rows**
+    - **Validates: Requirements 3.3**
+
+- [x] 9. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 10. Implement cursor overlay rendering
+  - [x] 10.1 Create CursorOverlay_Create() function
+    - Create transparent overlay window
+    - Position over edit control
+    - _Requirements: 4.1, 4.2_
+  - [x] 10.2 Implement CursorOverlay_Update()
+    - Calculate pixel positions for all cursors
+    - Trigger repaint
+    - _Requirements: 4.1_
+  - [x] 10.3 Implement CursorOverlay_Paint()
+    - Draw secondary cursor carets
+    - Draw selection highlights
+    - _Requirements: 4.1, 4.2_
+  - [x] 10.4 Add cursor blink timer
+    - Toggle cursor visibility
+    - Sync with system caret blink rate
+    - _Requirements: 4.1_
+
+- [x] 11. Update status bar for multi-cursor
+  - [x] 11.1 Add cursor count display to status bar
+    - Show "N cursors" when multi-cursor active
+    - _Requirements: 4.3_
+  - [x] 11.2 Add column mode indicator to status bar
+    - Show "COL" when column mode active
+    - _Requirements: 4.4_
+
+- [x] 12. Implement Drag and Drop file opening
+  - [x] 12.1 Enable drag & drop in main window
+    - Call DragAcceptFiles() in window creation
+    - _Requirements: 5.1_
+  - [x] 12.2 Implement WM_DROPFILES handler
+    - Extract file paths from HDROP
+    - Handle single and multiple files
+    - _Requirements: 5.2, 5.3_
+  - [x] 12.3 Implement duplicate file detection
+    - Check if file is already open
+    - Switch to existing tab if found
+    - _Requirements: 5.4_
+  - [x] 12.4 Implement file type validation
+    - Check file extension
+    - Warn for binary/unsupported files
+    - _Requirements: 5.5_
+  - [ ]* 12.5 Write property test for file drop tab count
+    - **Property 10: File Drop Opens Correct Tab Count**
+    - **Validates: Requirements 5.2, 5.3**
+  - [ ]* 12.6 Write property test for duplicate file handling
+    - **Property 11: Duplicate File Drop Switches Tab**
+    - **Validates: Requirements 5.4**
+
+- [x] 13. Implement undo integration
+  - [x] 13.1 Group multi-cursor edits as single undo operation
+    - Use EM_STOPGROUPTYPING before/after multi-cursor ops
+    - _Requirements: 6.1_
+  - [ ]* 13.2 Write property test for undo atomicity
+    - **Property 12: Multi-Cursor Undo Atomicity**
+    - **Validates: Requirements 6.1**
+
+- [x] 14. Implement find/replace integration
+  - [x] 14.1 Clear multi-cursor on find/replace activation
+    - Call MultiCursor_Clear() when find dialog opens
+    - _Requirements: 6.3_
+  - [ ]* 14.2 Write property test for find/replace clearing
+    - **Property 14: Find/Replace Clears Multi-Cursor**
+    - **Validates: Requirements 6.3**
+
+- [x] 15. Update Makefile and build configuration
+  - [x] 15.1 Add multi_cursor.c to Makefile
+    - Add compilation rule
+    - Add to object list
+    - _Requirements: All_
+  - [x] 15.2 Update build.bat for new files
+    - Include new source files
+    - _Requirements: All_
+
+- [x] 16. Final Checkpoint - Ensure all tests pass
+
+  - Ensure all tests pass, ask the user if questions arise.
